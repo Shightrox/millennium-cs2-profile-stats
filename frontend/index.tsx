@@ -44,6 +44,6 @@ const SettingsContent = () => {
 
 export default definePlugin(() => ({
 	title: 'CS2 Profile Stats',
-	icon: <IconsModule.Stats />,
+	icon: <IconsModule.Settings />,
 	content: <SettingsContent />,
 }));
