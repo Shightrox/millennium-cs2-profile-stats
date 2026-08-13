@@ -1,69 +1,49 @@
-import { Millennium, IconsModule, definePlugin, Field, DialogButton, usePluginConfig } from '@steambrew/client';
-
-class SomeClass {
-	static method(country: string, age: number) {
-		console.log(`country: ${country}, age: ${age}`);
-		return 'method called';
-	}
-}
-
-// Declare a function that exists on the backend
-// const backendMethod = callable<[{ message: string; status: boolean; count: number }], boolean>('test_frontend_message_callback');
-// Declare a function that exists on the webkit
-// const webkitMethod = callable<[{ message: string; status: boolean; count: number }], string>('webkit:someWebkitMethod');
+import { definePlugin, Field, IconsModule, TextField, ToggleField, usePluginConfig } from '@steambrew/client';
 
 const SettingsContent = () => {
-	// usePluginConfig subscribes to live config changes from both frontend and backend.
-	// When the Lua backend calls millennium.config.set("greeting", ...), this component re-renders automatically.
-	const [greeting, setGreeting] = usePluginConfig<string>('greeting');
+	const [leetifyApiKey, setLeetifyApiKey] = usePluginConfig<string>('leetify_api_key');
+	const [showSteamDetails, setShowSteamDetails] = usePluginConfig<boolean>('show_steam_details');
+	const [expandDetails, setExpandDetails] = usePluginConfig<boolean>('expand_details');
 
 	return (
-		<>
-			<Field label="Greeting" description={greeting ?? 'Loading...'} icon={<IconsModule.Settings />} bottomSeparator="standard" focusable>
-				<DialogButton
-					onClick={() => {
-						const next = greeting === 'Hello from Lua!' ? 'Hello from Frontend!' : 'Hello from Lua!';
-						setGreeting(next);
-					}}
-				>
-					Toggle Greeting
-				</DialogButton>
+		<div style={{ padding: '16px' }}>
+			<Field
+				label="Leetify API key"
+				description="Optional. Public requests work without a key, while a personal key provides better rate limits."
+				icon={<IconsModule.Settings />}
+				childrenLayout="below"
+				bottomSeparator="standard"
+			>
+				<TextField
+					value={leetifyApiKey ?? ''}
+					onChange={(event) => void setLeetifyApiKey(event.currentTarget.value.trim())}
+					bIsPassword
+					bShowClearAction
+					bAlwaysShowClearAction
+				/>
 			</Field>
-			<Field label="Plugin Settings" description="This is a description of the plugin settings." icon={<IconsModule.Settings />} bottomSeparator="standard" focusable>
-				<DialogButton
-					onClick={() => {
-						console.log('Button clicked!');
-					}}
-				>
-					Click Me
-				</DialogButton>
-			</Field>
-		</>
+
+			<ToggleField
+				label="Show Steam activity"
+				description="Show total CS2 hours, recent hours, and the Steam account creation date in the expanded view."
+				checked={showSteamDetails ?? true}
+				onChange={(checked) => void setShowSteamDetails(checked)}
+				bottomSeparator="standard"
+			/>
+
+			<ToggleField
+				label="Expand details by default"
+				description="Open the detailed Leetify, FACEIT, and Steam metrics when a profile loads."
+				checked={expandDetails ?? false}
+				onChange={(checked) => void setExpandDetails(checked)}
+				bottomSeparator="none"
+			/>
+		</div>
 	);
 };
 
-function hookedSettingsIcon() {
-	return {
-		SteamButton: (): any => {
-			return <IconsModule.Caution height={'20px'} />;
-		},
-	};
-}
-
-Millennium.exposeObj({ hookedSettingsIcon, SomeClass });
-
-export default definePlugin(() => {
-	// backendMethod({
-	// 	message: 'Hello World From Frontend!',
-	// 	status: true,
-	// 	count: 69,
-	// }).then((message: any) => {
-	// 	console.log('Result from backendMethod:', message);
-	// });
-
-	return {
-		title: 'My Plugin',
-		icon: <IconsModule.Settings />,
-		content: <SettingsContent />,
-	};
-});
+export default definePlugin(() => ({
+	title: 'CS2 Profile Stats',
+	icon: <IconsModule.Stats />,
+	content: <SettingsContent />,
+}));

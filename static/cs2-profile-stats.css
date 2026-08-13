@@ -1,0 +1,332 @@
+.cs2ps-root {
+	margin: 0 0 15px;
+	font-family: "Motiva Sans", Arial, Helvetica, sans-serif;
+	color: #dfe6ee;
+}
+
+.cs2ps-card {
+	overflow: hidden;
+	background: linear-gradient(155deg, rgba(15, 25, 36, 0.96), rgba(7, 13, 20, 0.96));
+	border: 1px solid rgba(123, 156, 181, 0.18);
+	border-radius: 6px;
+	box-shadow: 0 8px 28px rgba(0, 0, 0, 0.24);
+}
+
+.cs2ps-header {
+	box-sizing: border-box;
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	width: 100%;
+	padding: 11px 12px 10px;
+	color: #dfe6ee;
+	background: linear-gradient(90deg, rgba(32, 54, 72, 0.82), rgba(21, 36, 50, 0.65));
+	border: 0;
+	border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+	cursor: pointer;
+}
+
+.cs2ps-header:hover {
+	background: linear-gradient(90deg, rgba(38, 65, 85, 0.92), rgba(25, 43, 58, 0.76));
+}
+
+.cs2ps-title,
+.cs2ps-header-meta,
+.cs2ps-form,
+.cs2ps-form-row,
+.cs2ps-detail-heading,
+.cs2ps-provider-state {
+	display: flex;
+	align-items: center;
+}
+
+.cs2ps-title {
+	gap: 7px;
+	font-size: 12px;
+	font-weight: 700;
+	letter-spacing: 1.3px;
+}
+
+.cs2ps-title-mark {
+	width: 3px;
+	height: 14px;
+	background: #66c0f4;
+	border-radius: 3px;
+	box-shadow: 0 0 10px rgba(102, 192, 244, 0.55);
+}
+
+.cs2ps-header-meta {
+	gap: 7px;
+	font-size: 11px;
+	color: #8fa7b8;
+}
+
+.cs2ps-chevron {
+	display: inline-block;
+	font-size: 15px;
+	line-height: 10px;
+	transition: transform 160ms ease;
+}
+
+.cs2ps-is-expanded .cs2ps-chevron {
+	transform: rotate(180deg);
+}
+
+.cs2ps-summary-grid {
+	display: grid;
+	grid-template-columns: repeat(2, minmax(0, 1fr));
+	gap: 1px;
+	background: rgba(255, 255, 255, 0.055);
+}
+
+.cs2ps-metric {
+	box-sizing: border-box;
+	min-width: 0;
+	padding: 10px 11px 9px;
+	background: rgba(9, 18, 27, 0.97);
+}
+
+.cs2ps-metric-label,
+.cs2ps-metric-value {
+	display: block;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.cs2ps-metric-label {
+	margin-bottom: 3px;
+	font-size: 9px;
+	font-weight: 700;
+	line-height: 12px;
+	color: #718697;
+	letter-spacing: 0.75px;
+	text-transform: uppercase;
+}
+
+.cs2ps-metric-value {
+	font-size: 16px;
+	font-weight: 700;
+	line-height: 20px;
+	color: #dfe6ee;
+}
+
+.cs2ps-accent-premier .cs2ps-metric-value {
+	color: #d9b85c;
+}
+
+.cs2ps-accent-faceit .cs2ps-metric-value {
+	color: #ff6b24;
+}
+
+.cs2ps-accent-leetify .cs2ps-metric-value {
+	color: #f84982;
+}
+
+.cs2ps-accent-aim .cs2ps-metric-value {
+	color: #73c8f3;
+}
+
+.cs2ps-form-row {
+	min-height: 35px;
+	padding: 0 11px;
+	background: rgba(10, 19, 28, 0.98);
+	border-top: 1px solid rgba(255, 255, 255, 0.055);
+}
+
+.cs2ps-form-label {
+	margin-right: 12px;
+	font-size: 9px;
+	font-weight: 700;
+	color: #718697;
+	letter-spacing: 0.75px;
+}
+
+.cs2ps-form {
+	gap: 5px;
+}
+
+.cs2ps-form-result {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 20px;
+	height: 20px;
+	font-size: 10px;
+	font-weight: 800;
+	border-radius: 3px;
+}
+
+.cs2ps-form-win {
+	color: #8fd486;
+	background: rgba(78, 142, 70, 0.24);
+	border: 1px solid rgba(120, 198, 108, 0.23);
+}
+
+.cs2ps-form-loss {
+	color: #e47b7b;
+	background: rgba(153, 58, 58, 0.22);
+	border: 1px solid rgba(217, 94, 94, 0.21);
+}
+
+.cs2ps-form-unknown {
+	color: #95a7b5;
+	background: rgba(112, 132, 147, 0.15);
+}
+
+.cs2ps-form-empty {
+	font-size: 11px;
+	color: #657888;
+}
+
+.cs2ps-details {
+	background: rgba(5, 11, 17, 0.82);
+	border-top: 1px solid rgba(102, 192, 244, 0.12);
+}
+
+.cs2ps-details[hidden] {
+	display: none;
+}
+
+.cs2ps-detail-section {
+	padding: 11px;
+	border-bottom: 1px solid rgba(255, 255, 255, 0.055);
+}
+
+.cs2ps-detail-heading {
+	justify-content: space-between;
+	gap: 8px;
+	margin-bottom: 9px;
+	font-size: 11px;
+	font-weight: 700;
+	color: #b8c7d3;
+}
+
+.cs2ps-detail-heading a,
+.cs2ps-source-link {
+	font-size: 10px;
+	font-weight: 500;
+	color: #66c0f4;
+	text-decoration: none;
+}
+
+.cs2ps-detail-heading a:hover,
+.cs2ps-source-link:hover {
+	color: #9bd8fa;
+	text-decoration: underline;
+}
+
+.cs2ps-detail-grid {
+	display: grid;
+	grid-template-columns: repeat(3, minmax(0, 1fr));
+	gap: 6px;
+}
+
+.cs2ps-detail-grid-five {
+	grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.cs2ps-detail-metric {
+	min-width: 0;
+	padding: 7px;
+	background: rgba(255, 255, 255, 0.035);
+	border: 1px solid rgba(255, 255, 255, 0.04);
+	border-radius: 4px;
+	text-align: center;
+}
+
+.cs2ps-detail-metric span,
+.cs2ps-detail-metric strong {
+	display: block;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.cs2ps-detail-metric span {
+	margin-bottom: 3px;
+	font-size: 9px;
+	color: #657888;
+}
+
+.cs2ps-detail-metric strong {
+	font-size: 12px;
+	color: #d9e2e9;
+}
+
+.cs2ps-source-link {
+	display: inline-block;
+	margin-top: 8px;
+	color: #8299aa;
+}
+
+.cs2ps-provider-state {
+	gap: 7px;
+	padding: 10px 11px;
+	font-size: 11px;
+	color: #8295a4;
+	border-bottom: 1px solid rgba(255, 255, 255, 0.055);
+}
+
+.cs2ps-provider-dot {
+	width: 6px;
+	height: 6px;
+	background: #708393;
+	border-radius: 50%;
+}
+
+.cs2ps-provider-loading .cs2ps-provider-dot {
+	background: #66c0f4;
+	box-shadow: 0 0 7px rgba(102, 192, 244, 0.7);
+}
+
+.cs2ps-provider-error .cs2ps-provider-dot,
+.cs2ps-provider-rate_limited .cs2ps-provider-dot,
+.cs2ps-provider-unauthorized .cs2ps-provider-dot {
+	background: #d36a6a;
+}
+
+.cs2ps-leetify-attribution {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	min-height: 30px;
+	opacity: 0.72;
+	transition: opacity 120ms ease;
+}
+
+.cs2ps-leetify-attribution:hover {
+	opacity: 1;
+}
+
+.cs2ps-leetify-attribution img {
+	display: block;
+	max-width: 118px;
+	max-height: 22px;
+}
+
+.cs2ps-spinner {
+	box-sizing: border-box;
+	width: 11px;
+	height: 11px;
+	border: 1px solid rgba(102, 192, 244, 0.25);
+	border-top-color: #66c0f4;
+	border-radius: 50%;
+	animation: cs2ps-spin 700ms linear infinite;
+}
+
+@keyframes cs2ps-spin {
+	to {
+		transform: rotate(360deg);
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.cs2ps-spinner {
+		animation-duration: 1400ms;
+	}
+
+	.cs2ps-chevron {
+		transition: none;
+	}
+}

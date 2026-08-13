@@ -1,88 +1,279 @@
+local cjson = require("cjson")
+local http = require("http")
 local logger = require("logger")
 local millennium = require("millennium")
 
-function test_frontend_message_callback(message, status, count)
-    logger:info("test_frontend_message_callback called")
-    logger:info("Received args: " .. table.concat({ message, tostring(status), tostring(count) }, ", "))
+local PLUGIN_VERSION = "0.1.0"
+local USER_AGENT = "millennium-cs2-profile-stats/" .. PLUGIN_VERSION
 
-    return true
+local function encode(payload)
+    local ok, result = pcall(cjson.encode, payload)
+    if ok then
+        return result
+    end
+
+    logger:error("Failed to encode an IPC response: " .. tostring(result))
+    return [[{"status":"error","message":"Could not encode provider response."}]]
+end
+
+local function is_null(value)
+    return value == nil or value == cjson.null
+end
+
+local function optional(value)
+    if is_null(value) then
+        return nil
+    end
+
+    return value
+end
+
+local function trimmed_config(key)
+    local value = millennium.config.get(key)
+    if type(value) ~= "string" then
+        return nil
+    end
+
+    value = value:match("^%s*(.-)%s*$")
+    if value == "" then
+        return nil
+    end
+
+    return value
+end
+
+local function valid_steam_id(steam_id)
+    return type(steam_id) == "string" and steam_id:match("^%d%d%d%d%d%d%d%d%d%d%d%d%d%d%d%d%d$") ~= nil
+end
+
+local function request_json(url, headers)
+    local response, request_error = http.get(url, {
+        headers = headers,
+        timeout = 10,
+        follow_redirects = true,
+        verify_ssl = true,
+        user_agent = USER_AGENT,
+    })
+
+    if response == nil then
+        return nil, 0, request_error or "Network request failed."
+    end
+
+    if response.status < 200 or response.status >= 300 then
+        return nil, response.status, "HTTP " .. tostring(response.status)
+    end
+
+    local ok, data = pcall(cjson.decode, response.body)
+    if not ok or type(data) ~= "table" then
+        return nil, response.status, "Invalid JSON response."
+    end
+
+    return data, response.status, nil
+end
+
+local function post_json(url, body, headers)
+    local response, request_error = http.post(url, body, {
+        headers = headers,
+        timeout = 10,
+        follow_redirects = true,
+        verify_ssl = true,
+        user_agent = USER_AGENT,
+    })
+
+    if response == nil then
+        return nil, 0, request_error or "Network request failed."
+    end
+
+    if response.status < 200 or response.status >= 300 then
+        return nil, response.status, "HTTP " .. tostring(response.status)
+    end
+
+    local ok, data = pcall(cjson.decode, response.body)
+    if not ok or type(data) ~= "table" then
+        return nil, response.status, "Invalid JSON response."
+    end
+
+    return data, response.status, nil
+end
+
+local function error_status(http_status)
+    if http_status == 401 or http_status == 403 then
+        return "unauthorized"
+    elseif http_status == 404 then
+        return "not_found"
+    elseif http_status == 429 then
+        return "rate_limited"
+    end
+
+    return "error"
+end
+
+local function provider_error(provider, http_status, message)
+    logger:warn(provider .. " request failed (" .. tostring(http_status) .. "): " .. tostring(message))
+    return encode({
+        status = error_status(http_status),
+        message = message or "Provider request failed.",
+    })
+end
+
+function get_preferences()
+    return encode({
+        show_steam_details = millennium.config.get("show_steam_details") ~= false,
+        expand_details = millennium.config.get("expand_details") == true,
+    })
+end
+
+function get_leetify_profile(steamId)
+    if not valid_steam_id(steamId) then
+        return encode({ status = "error", message = "Invalid SteamID64." })
+    end
+
+    local headers = { ["Accept"] = "application/json" }
+    local api_key = trimmed_config("leetify_api_key")
+    if api_key ~= nil then
+        headers["_leetify_key"] = api_key
+    end
+
+    local url = "https://api-public.cs-prod.leetify.com/v3/profile?steam64_id=" .. steamId
+    local profile, status, request_error = request_json(url, headers)
+    if profile == nil then
+        return provider_error("Leetify", status, request_error)
+    end
+
+    if profile.privacy_mode ~= nil and profile.privacy_mode ~= cjson.null and profile.privacy_mode ~= "public" then
+        return encode({ status = "private", message = "This Leetify profile is private." })
+    end
+
+    local ranks = type(profile.ranks) == "table" and profile.ranks or {}
+    local rating = type(profile.rating) == "table" and profile.rating or {}
+    local recent_matches = {}
+
+    if type(profile.recent_matches) == "table" then
+        for index = 1, math.min(#profile.recent_matches, 5) do
+            local match = profile.recent_matches[index]
+            if type(match) == "table" then
+                recent_matches[#recent_matches + 1] = {
+                    outcome = optional(match.outcome),
+                    map_name = optional(match.map_name),
+                    finished_at = optional(match.finished_at),
+                }
+            end
+        end
+    end
+
+    return encode({
+        status = "ok",
+        data = {
+            name = optional(profile.name),
+            steam64_id = steamId,
+            profile_id = optional(profile.id),
+            privacy_mode = optional(profile.privacy_mode),
+            winrate = optional(profile.winrate),
+            total_matches = optional(profile.total_matches),
+            first_match_date = optional(profile.first_match_date),
+            ranks = {
+                premier = optional(ranks.premier),
+                faceit = optional(ranks.faceit),
+                faceit_elo = optional(ranks.faceit_elo),
+                leetify = optional(ranks.leetify),
+            },
+            rating = {
+                aim = optional(rating.aim),
+                positioning = optional(rating.positioning),
+                utility = optional(rating.utility),
+            },
+            recent_matches = recent_matches,
+        },
+        fetched_at = os.time(),
+    })
+end
+
+function get_faceit_profile(steamId)
+    if not valid_steam_id(steamId) then
+        return encode({ status = "error", message = "Invalid SteamID64." })
+    end
+
+    local headers = {
+        ["Accept"] = "application/json",
+        ["Content-Type"] = "application/json",
+    }
+    local lookup_body = cjson.encode({
+        steamUrl = "https://steamcommunity.com/profiles/" .. steamId,
+    })
+    local player, player_status, player_error = post_json("https://faceit-finder.com/api/search/steam", lookup_body, headers)
+    if player == nil then
+        return provider_error("FACEIT lookup", player_status, player_error)
+    end
+
+    local cs2 = type(player.games) == "table" and player.games.cs2 or nil
+    if type(cs2) ~= "table" or is_null(player.player_id) then
+        return encode({ status = "not_found", message = "No FACEIT CS2 account was found." })
+    end
+
+    local stats_url = "https://faceit-finder.com/id/" .. steamId .. "?lang=en"
+    local stats_response, stats_error = http.get(stats_url, {
+        headers = { ["Accept"] = "text/html" },
+        timeout = 12,
+        follow_redirects = true,
+        verify_ssl = true,
+        user_agent = USER_AGENT,
+    })
+    local lifetime = {}
+    local partial_message = nil
+
+    if stats_response ~= nil and stats_response.status == 200 then
+        local hero = stats_response.body:match("Kluczowe liczby.-ELO Rating") or stats_response.body:match("Key numbers.-ELO Rating") or stats_response.body
+        lifetime.matches = hero:match(">Matches</p>%s*<p[^>]*>([^<]+)</p>")
+        lifetime.winrate = hero:match(">Win Rate</p>%s*<p[^>]*>([^<]+)</p>")
+        lifetime.kd = hero:match(">K/D</p>%s*<p[^>]*>([^<]+)</p>")
+        lifetime.adr = hero:match(">ADR</p>%s*<p[^>]*>([^<]+)</p>")
+        lifetime.headshots = hero:match(">HS %%</p>%s*<p[^>]*>([^<]+)</p>")
+    else
+        partial_message = "FACEIT profile loaded, but lifetime statistics are unavailable."
+        local stats_status = stats_response and stats_response.status or 0
+        logger:warn("FACEIT stats page failed (" .. tostring(stats_status) .. "): " .. tostring(stats_error))
+    end
+
+    return encode({
+        status = "ok",
+        message = partial_message,
+        data = {
+            nickname = optional(player.nickname),
+            country = optional(player.country),
+            player_id = optional(player.player_id),
+            level = optional(cs2.skill_level),
+            elo = optional(cs2.faceit_elo),
+            stats = {
+                matches = optional(lifetime.matches),
+                kd = optional(lifetime.kd),
+                adr = optional(lifetime.adr),
+                headshots = optional(lifetime.headshots),
+                winrate = optional(lifetime.winrate),
+                recent_results = {},
+            },
+        },
+        fetched_at = os.time(),
+    })
+end
+
+local function set_default(key, value)
+    if millennium.config.get(key) == nil then
+        millennium.config.set(key, value)
+    end
 end
 
 local function on_load()
-    logger:info("Comparing millennium version: " .. millennium.version())
-
-    -- We are running a Millennium version > 2.29.3
-    local target_version = "2.29.3"
-    if millennium.cmp_version(millennium.version(), target_version) == 1 then
-        logger:info("Running Millennium > " .. target_version)
-    end
-
-    logger:info("Example plugin loaded with Millennium version " .. millennium.version())
-
-    -- Set a default greeting if one doesn't exist yet
-    local greeting = millennium.config.get("greeting")
-    if greeting == nil then
-        millennium.config.set("greeting", "Hello from Lua!")
-        logger:info("Set default greeting")
-    else
-        logger:info("Current greeting: " .. tostring(greeting))
-    end
-
-    -- Listen for config changes (from frontend, MEP, or anywhere)
-    millennium.config.on_change(function(key, value)
-        logger:info("Config changed: " .. key .. " = " .. tostring(value))
-    end)
-
+    logger:info("Loading CS2 Profile Stats v" .. PLUGIN_VERSION .. " on Millennium " .. millennium.version())
+    set_default("show_steam_details", true)
+    set_default("expand_details", false)
     millennium.ready()
 end
 
--- Called when your plugin is unloaded. This happens when the plugin is disabled or Steam is shutting down.
--- NOTE: If Steam crashes or is force closed by task manager, this function may not be called -- so don't rely on it for critical cleanup.
 local function on_unload()
-    logger:info("Plugin unloaded")
-end
-
--- Called when the Steam UI has fully loaded.
-local function on_frontend_loaded()
-    logger:info("Frontend loaded")
-    local result = millennium.call_frontend_method("SomeClass.method", { 18, "USA", false })
-    logger:info(result)
+    logger:info("Unloading CS2 Profile Stats")
 end
 
 return {
-    on_frontend_loaded = on_frontend_loaded,
     on_load = on_load,
     on_unload = on_unload,
-
-    -- patches let you directly override content from steam's js files as if they served with it.
-    -- effectively, this means you can trampoline, hook, block, or entirely change the functionality of steam's js files.
-    -- If you check the network tab on the chrome inspector, you'll see this file has directly served with this patch inside of it,
-    -- Millennium did all the hard lifting :)
-    patches = {
-        {
-            -- this find segment dictates the content you are able to edit. it essentially casts a net over a portion of the file content
-            -- and tells Millennium you'll be editing it. This helps with optimization, and preventing Millennium from selecting content you didn't me to select.
-            -- Uses RE2 regex syntax matched against file content.
-            find =
-            [["#Menu_Account"\):\(0,\w+\.jsxs\)\("div",\{className:\w+\(\)\.SteamButton,children:\[\(0,\w+\.jsx\)\(\w+\.SteamLogo]],
-
-            -- Tell Millennium to only target files starting with "chunk" as this is the file we are concerned with.
-            -- This helps Millennium optimize your selector, and prevent accidentally patching files you didn't mean to.
-            file = [[chunk~[0-9a-f]+\.js]],
-
-            -- All transforms are handled with RE2 regex.
-            transforms = {
-                {
-                    -- Capture the jsx runtime fn name (\1) so the replace stays correct even if it's minified differently.
-                    match = [[\(0,(\w+\.jsx)\)\(\w+\.SteamLogo]],
-                    -- #{{self}} is a macro that denotes your plugins frontend instance.
-                    -- hookedSettingsIcon() will be called on your frontend now.
-                    -- Make sure to "Millennium.exposeObj({ hookedSettingsIcon });" first, otherwise the function will be private by default.
-                    replace = [[(0,\1)(#{{self}}?.hookedSettingsIcon?.().SteamButton||(()=>null)]], -- fallback to no-op when plugin isn't ready yet to avoid React error #130
-                }
-                -- this is a list, you can add more elements
-            }
-        }
-        -- this is a list, you can add more elements
-    }
 }
