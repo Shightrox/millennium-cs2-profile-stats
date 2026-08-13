@@ -1,4 +1,4 @@
-local cjson = require("cjson")
+local cjson = require("json")
 local http = require("http")
 local logger = require("logger")
 local millennium = require("millennium")
