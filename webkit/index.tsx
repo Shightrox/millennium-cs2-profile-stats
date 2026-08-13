@@ -158,10 +158,11 @@ const formatPercent = (value: unknown) => {
 
 const statusMessage = (provider: 'Leetify' | 'FACEIT', response: ProviderResponse<unknown>) => {
 	if (response.status === 'loading') return `Loading ${provider}…`;
+	if (response.message) return response.message;
 	if (response.status === 'not_found') return `${provider} profile not found.`;
 	if (response.status === 'private') return `${provider} profile is private.`;
 	if (response.status === 'rate_limited') return `${provider} rate limit reached.`;
-	return response.message || `${provider} data is unavailable.`;
+	return `${provider} data is unavailable.`;
 };
 
 type MetricIcon = 'aim' | 'reaction' | 'winrate' | 'premier' | 'rating';

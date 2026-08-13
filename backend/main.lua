@@ -250,7 +250,10 @@ function get_faceit_profile(steamId)
 
     local cs2 = type(player.games) == "table" and player.games.cs2 or nil
     if type(cs2) ~= "table" or is_null(player.player_id) then
-        return encode({ status = "not_found", message = "No FACEIT CS2 account was found." })
+        return encode({
+            status = "not_found",
+            message = "FACEIT lookup returned no CS2 account (HTTP " .. tostring(player_status) .. ").",
+        })
     end
 
     local lifetime = {}

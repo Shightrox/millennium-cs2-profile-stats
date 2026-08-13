@@ -166,14 +166,15 @@
 .cs2ps-metric {
 	box-sizing: border-box;
 	min-width: 0;
-	gap: 7px;
-	padding: 11px 7px 10px;
+	gap: 5px;
+	padding: 11px 5px 10px;
 	background: rgba(9, 18, 27, 0.97);
 }
 
 .cs2ps-metric-icon {
-	width: 27px;
-	height: 27px;
+	box-sizing: border-box;
+	width: 23px;
+	height: 23px;
 	color: #78a4bf;
 	background: rgba(120, 164, 191, 0.08);
 	border: 1px solid rgba(120, 164, 191, 0.12);
@@ -181,8 +182,8 @@
 }
 
 .cs2ps-metric-icon svg {
-	width: 17px;
-	height: 17px;
+	width: 14px;
+	height: 14px;
 	fill: none;
 	stroke: currentColor;
 	stroke-linecap: round;
@@ -191,6 +192,7 @@
 }
 
 .cs2ps-metric-copy {
+	flex: 1 1 auto;
 	min-width: 0;
 }
 
@@ -213,7 +215,7 @@
 }
 
 .cs2ps-metric-value {
-	font-size: 14px;
+	font-size: 13px;
 	font-weight: 700;
 	line-height: 18px;
 	color: #dfe6ee;
