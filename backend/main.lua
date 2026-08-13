@@ -72,7 +72,11 @@ local function request_json(url, headers)
 end
 
 local function post_json(url, body, headers)
-    local response, request_error = http.post(url, body, {
+    -- Millennium 3.4.0's http.post wrapper loses its generated options table and
+    -- performs a GET. The generic request entry point sends the POST correctly.
+    local response, request_error = http.request(url, {
+        method = "POST",
+        data = body,
         headers = headers,
         timeout = 10,
         follow_redirects = true,
