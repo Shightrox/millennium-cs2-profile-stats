@@ -44,6 +44,9 @@ type LeetifyProfile = {
 	};
 	stats: {
 		reaction_time_ms?: number;
+		damage_time_min_ms?: number;
+		damage_time_max_ms?: number;
+		damage_time_source_url?: string;
 		preaim?: number;
 		spray_accuracy?: number;
 		counter_strafing?: number;
@@ -180,6 +183,13 @@ const formatMilliseconds = (value: unknown) => {
 	return parsed === undefined ? '—' : `${formatInteger(parsed)} ms`;
 };
 
+const formatSecondsRange = (minimum: unknown, maximum: unknown) => {
+	const parsedMinimum = finiteNumber(minimum);
+	const parsedMaximum = finiteNumber(maximum);
+	if (parsedMinimum === undefined || parsedMaximum === undefined) return '—';
+	return `${formatMetric(parsedMinimum / 1000, 2)}–${formatMetric(parsedMaximum / 1000, 2)} s`;
+};
+
 const formatPercent = (value: unknown) => {
 	const parsed = finiteNumber(value);
 	return parsed === undefined ? '—' : `${formatMetric(parsed, 1)}%`;
@@ -272,6 +282,7 @@ const renderDetails = (state: ViewState, steamId: string) => {
 	const hasFaceitLifetime = Boolean(
 		faceit && [faceit.stats.kd, faceit.stats.adr, faceit.stats.headshots, faceit.stats.winrate, faceit.stats.matches].some(hasValue),
 	);
+	const hasScopeDamageTime = hasValue(leetify?.stats.damage_time_min_ms) && hasValue(leetify?.stats.damage_time_max_ms);
 
 	const leetifySection =
 		state.leetify.status === 'ok' && leetify
@@ -283,7 +294,7 @@ const renderDetails = (state: ViewState, steamId: string) => {
 						${detailedMetric('Leetify rating', formatLeetifyRating(leetify.ranks.leetify))}
 						${detailedMetric('Matches', formatInteger(leetify.total_matches))}
 						${detailedMetric('Aim', formatMetric(leetify.rating.aim))}
-						${detailedMetric('Time to damage', formatMilliseconds(leetify.stats.reaction_time_ms))}
+						${hasScopeDamageTime ? detailedMetric('AWP time to damage', formatSecondsRange(leetify.stats.damage_time_min_ms, leetify.stats.damage_time_max_ms)) : detailedMetric('Reaction time', formatMilliseconds(leetify.stats.reaction_time_ms))}
 						${detailedMetric('Winrate', formatWinrate(leetify.winrate))}
 						${detailedMetric('Positioning', formatMetric(leetify.rating.positioning))}
 						${detailedMetric('Utility', formatMetric(leetify.rating.utility))}
@@ -292,6 +303,7 @@ const renderDetails = (state: ViewState, steamId: string) => {
 						${detailedMetric('Counter-strafing', formatPercent(leetify.stats.counter_strafing))}
 						${detailedMetric('Opening', formatMetric(leetify.rating.opening, 2))}
 					</div>
+					${hasScopeDamageTime && leetify.stats.damage_time_source_url ? `<a class="cs2ps-source-link" href="${escapeHtml(leetify.stats.damage_time_source_url)}" target="_blank" rel="noopener">AWP timing provided by SCOPE.GG ↗</a>` : ''}
 				</section>
 			`
 			: providerState('Leetify', state.leetify);
@@ -348,6 +360,11 @@ const renderCard = (root: HTMLElement, state: ViewState, steamId: string) => {
 	const hasPerformanceData = state.leetify.status === 'ok' && Boolean(leetify);
 	const providersFinished = state.leetify.status !== 'loading' && state.faceit.status !== 'loading';
 	const faceitFound = state.faceit.status === 'ok' || Boolean(faceit?.level) || Boolean(leetify?.ranks.faceit);
+	const hasScopeDamageTime = hasValue(leetify?.stats.damage_time_min_ms) && hasValue(leetify?.stats.damage_time_max_ms);
+	const reactionLabel = hasScopeDamageTime ? 'AWP reaction' : 'Reaction';
+	const reactionValue = hasScopeDamageTime
+		? formatSecondsRange(leetify?.stats.damage_time_min_ms, leetify?.stats.damage_time_max_ms)
+		: formatMilliseconds(leetify?.stats.reaction_time_ms);
 	const faceitStatus = faceitFound
 		? { modifier: 'cs2ps-faceit-found', text: 'FACEIT account found' }
 		: !providersFinished
@@ -379,7 +396,7 @@ const renderCard = (root: HTMLElement, state: ViewState, steamId: string) => {
 			</div>
 			<div class="cs2ps-summary-grid">
 				${metric('aim', 'Aim', formatMetric(leetify?.rating.aim), 'cs2ps-accent-aim')}
-				${metric('reaction', 'Reaction', formatMilliseconds(leetify?.stats.reaction_time_ms), 'cs2ps-accent-reaction')}
+				${metric('reaction', reactionLabel, reactionValue, 'cs2ps-accent-reaction')}
 				${metric('winrate', 'Winrate', formatWinrate(leetify?.winrate), 'cs2ps-accent-winrate')}
 			</div>
 			<div class="cs2ps-form-row">

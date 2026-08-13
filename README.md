@@ -20,11 +20,12 @@ The card is inserted into the right-hand column of Steam profiles, below the cur
 
 ## Data sources
 
-- [Leetify Public CS API](https://api-public-docs.cs-prod.leetify.com/) for Leetify and Premier metrics. A Leetify developer key is optional and only improves rate limits.
+- [Leetify Public CS API](https://api-public-docs.cs-prod.leetify.com/) for Leetify and Premier metrics. A Leetify developer key is optional and only improves rate limits. If that API does not index an otherwise public legacy profile, the plugin falls back to the keyless profile endpoint used by Leetify's web client.
+- [SCOPE.GG](https://scope.gg/) public player pages for an AWP time-to-damage range when that metric is absent from a legacy Leetify profile.
 - [Faceit Finder](https://faceit-finder.com/) for zero-configuration Steam-to-FACEIT lookup and public FACEIT statistics.
 - Steam Community's public profile XML for SteamID64, account age, and public playtime.
 
-Leetify may return data only for registered users whose profiles are public. Private Steam game details also prevent playtime from being displayed.
+Leetify may expose fewer detailed metrics for unregistered players; the summary ratings and recent matches remain available when Leetify has tracked them. Private Steam game details prevent playtime from being displayed.
 
 FACEIT integration is isolated behind its own provider because the zero-configuration lookup is not an official, versioned FACEIT API. If that source changes, Leetify and Steam data continue to work.
 

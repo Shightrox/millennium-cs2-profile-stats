@@ -3,7 +3,7 @@ local http = require("http")
 local logger = require("logger")
 local millennium = require("millennium")
 
-local PLUGIN_VERSION = "0.2.1"
+local PLUGIN_VERSION = "0.2.2"
 local USER_AGENT = "millennium-cs2-profile-stats/" .. PLUGIN_VERSION
 
 local function encode(payload)
@@ -127,27 +127,27 @@ function get_preferences()
     })
 end
 
-function get_leetify_profile(steamId)
-    if not valid_steam_id(steamId) then
-        return encode({ status = "error", message = "Invalid SteamID64." })
+local function number_or_nil(value)
+    value = optional(value)
+    if type(value) == "number" then
+        return value
+    elseif type(value) == "string" then
+        return tonumber(value)
     end
 
-    local headers = { ["Accept"] = "application/json" }
-    local api_key = trimmed_config("leetify_api_key")
-    if api_key ~= nil then
-        headers["_leetify_key"] = api_key
+    return nil
+end
+
+local function scaled_rating(value)
+    local number = number_or_nil(value)
+    if number == nil then
+        return nil
     end
 
-    local url = "https://api-public.cs-prod.leetify.com/v3/profile?steam64_id=" .. steamId
-    local profile, status, request_error = request_json(url, headers)
-    if profile == nil then
-        return provider_error("Leetify", status, request_error)
-    end
+    return number * 100
+end
 
-    if profile.privacy_mode ~= nil and profile.privacy_mode ~= cjson.null and profile.privacy_mode ~= "public" then
-        return encode({ status = "private", message = "This Leetify profile is private." })
-    end
-
+local function normalize_public_leetify_profile(profile, steam_id)
     local ranks = type(profile.ranks) == "table" and profile.ranks or {}
     local rating = type(profile.rating) == "table" and profile.rating or {}
     local stats = type(profile.stats) == "table" and profile.stats or {}
@@ -166,37 +166,297 @@ function get_leetify_profile(steamId)
         end
     end
 
+    return {
+        name = optional(profile.name),
+        steam64_id = steam_id,
+        profile_id = optional(profile.id),
+        privacy_mode = optional(profile.privacy_mode),
+        winrate = optional(profile.winrate),
+        total_matches = optional(profile.total_matches),
+        first_match_date = optional(profile.first_match_date),
+        ranks = {
+            premier = optional(ranks.premier),
+            faceit = optional(ranks.faceit),
+            faceit_elo = optional(ranks.faceit_elo),
+            leetify = optional(ranks.leetify),
+        },
+        rating = {
+            aim = optional(rating.aim),
+            positioning = optional(rating.positioning),
+            utility = optional(rating.utility),
+            clutch = scaled_rating(rating.clutch),
+            opening = scaled_rating(rating.opening),
+        },
+        stats = {
+            reaction_time_ms = optional(stats.reaction_time_ms),
+            preaim = optional(stats.preaim),
+            spray_accuracy = optional(stats.spray_accuracy),
+            counter_strafing = optional(stats.counter_strafing_good_shots_ratio),
+        },
+        recent_matches = recent_matches,
+    }
+end
+
+local function latest_legacy_rank(games, expected_rank_type, expected_source)
+    for _, match in ipairs(games) do
+        if type(match) == "table" then
+            local rank = number_or_nil(match.skillLevel)
+            local rank_type = number_or_nil(match.rankType)
+            local source = type(match.dataSource) == "string" and match.dataSource:lower() or ""
+            local source_matches = expected_source == nil or source:find(expected_source, 1, true) ~= nil
+            if rank ~= nil and rank > 0 and rank_type == expected_rank_type and source_matches then
+                return rank
+            end
+        end
+    end
+
+    return nil
+end
+
+local function average_legacy_stat(games, limit, key, multiplier)
+    local total = 0
+    local count = 0
+
+    for index = 1, math.min(#games, limit) do
+        local match = games[index]
+        local value = type(match) == "table" and number_or_nil(match[key]) or nil
+        if value ~= nil and value > 0 then
+            total = total + value
+            count = count + 1
+        end
+    end
+
+    if count == 0 then
+        return nil
+    end
+
+    return (total / count) * (multiplier or 1)
+end
+
+local function subtract_decimal_strings(left, right)
+    local result = {}
+    local borrow = 0
+    local right_offset = #left - #right
+
+    for index = #left, 1, -1 do
+        local left_digit = tonumber(left:sub(index, index))
+        local right_index = index - right_offset
+        local right_digit = right_index >= 1 and tonumber(right:sub(right_index, right_index)) or 0
+        if left_digit == nil or right_digit == nil then
+            return nil
+        end
+
+        local digit = left_digit - right_digit - borrow
+        if digit < 0 then
+            digit = digit + 10
+            borrow = 1
+        else
+            borrow = 0
+        end
+        result[#result + 1] = tostring(digit)
+    end
+
+    if borrow ~= 0 then
+        return nil
+    end
+
+    local value = table.concat(result):reverse():gsub("^0+", "")
+    return value ~= "" and value or "0"
+end
+
+local function table_contains(values, expected)
+    if type(values) ~= "table" then
+        return false
+    end
+
+    for _, value in ipairs(values) do
+        if value == expected then
+            return true
+        end
+    end
+
+    return false
+end
+
+local function get_scope_damage_time(steam_id)
+    local account_id = subtract_decimal_strings(steam_id, "76561197960265728")
+    if account_id == nil then
+        return nil, nil, nil
+    end
+
+    local scope_url = "https://app.scope.gg/progress/" .. account_id
+    local response, request_error = http.get(scope_url, {
+        headers = { ["Accept"] = "text/html" },
+        timeout = 6,
+        follow_redirects = true,
+        verify_ssl = true,
+        user_agent = USER_AGENT,
+    })
+
+    if response == nil or response.status < 200 or response.status >= 300 then
+        logger:warn("SCOPE.GG enrichment unavailable (" .. tostring(response and response.status or 0) .. "): " .. tostring(request_error))
+        return nil, nil, nil
+    end
+
+    local next_data_json = response.body:match('<script id="__NEXT_DATA__" type="application/json">(.-)</script>')
+    if next_data_json == nil then
+        return nil, nil, nil
+    end
+
+    local ok, next_data = pcall(cjson.decode, next_data_json)
+    if not ok or type(next_data) ~= "table" then
+        return nil, nil, nil
+    end
+
+    local props = type(next_data.props) == "table" and next_data.props or {}
+    local initial_state = type(props.initialState) == "table" and props.initialState or {}
+    local dashboard = type(initial_state.publicDashboard) == "table" and initial_state.publicDashboard or {}
+    local ratings = type(dashboard.ratings) == "table" and dashboard.ratings or {}
+    local rating_payload = type(ratings.ratings) == "table" and ratings.ratings or {}
+    local all_ratings = type(rating_payload.Ratings) == "table" and rating_payload.Ratings or {}
+    local by_side = type(all_ratings.StatsBySide) == "table" and all_ratings.StatsBySide or {}
+    local general = type(by_side.GeneralStats) == "table" and by_side.GeneralStats or {}
+    local metrics = type(general.Metrics) == "table" and general.Metrics or {}
+
+    for _, metric in ipairs(metrics) do
+        if type(metric) == "table" and metric.ID == "MedianDamageTimeByClass" and table_contains(metric.ShowToRoles, "Sniper") then
+            local aggregated = type(metric.Aggregated) == "table" and metric.Aggregated or {}
+            local range = type(aggregated[1]) == "table" and aggregated[1] or {}
+            local minimum = number_or_nil(range[1])
+            local maximum = number_or_nil(range[2])
+            if minimum ~= nil and maximum ~= nil then
+                return minimum * 1000, maximum * 1000, scope_url
+            end
+        end
+    end
+
+    return nil, nil, nil
+end
+
+local function normalize_legacy_leetify_profile(profile, steam_id)
+    local ratings = type(profile.recentGameRatings) == "table" and profile.recentGameRatings or {}
+    local meta = type(profile.meta) == "table" and profile.meta or {}
+    local games = type(profile.games) == "table" and profile.games or {}
+    local games_played = number_or_nil(ratings.gamesPlayed) or #games
+    local aggregate_limit = math.min(#games, games_played)
+    local wins = 0
+    local recent_matches = {}
+
+    for index = 1, aggregate_limit do
+        local match = games[index]
+        if type(match) == "table" and match.matchResult == "win" then
+            wins = wins + 1
+        end
+    end
+
+    for index = 1, math.min(#games, 5) do
+        local match = games[index]
+        if type(match) == "table" then
+            recent_matches[#recent_matches + 1] = {
+                outcome = optional(match.matchResult),
+                map_name = optional(match.mapName),
+                finished_at = optional(match.gameFinishedAt),
+            }
+        end
+    end
+
+    local first_match_date = nil
+    if #games > 0 and type(games[#games]) == "table" then
+        first_match_date = optional(games[#games].gameFinishedAt)
+    end
+
+    return {
+        name = optional(meta.name),
+        steam64_id = steam_id,
+        profile_id = optional(meta.leetifyUserId),
+        privacy_mode = "public",
+        winrate = aggregate_limit > 0 and wins / aggregate_limit or nil,
+        total_matches = games_played,
+        first_match_date = first_match_date,
+        ranks = {
+            premier = latest_legacy_rank(games, 11, "matchmaking"),
+            faceit = latest_legacy_rank(games, 3, "faceit"),
+            faceit_elo = nil,
+            leetify = scaled_rating(ratings.leetify),
+        },
+        rating = {
+            aim = optional(ratings.aim),
+            positioning = optional(ratings.positioning),
+            utility = optional(ratings.utility),
+            clutch = scaled_rating(ratings.clutch),
+            opening = scaled_rating(ratings.opening),
+        },
+        stats = {
+            reaction_time_ms = average_legacy_stat(games, aggregate_limit, "reactionTime", 1000),
+            preaim = average_legacy_stat(games, aggregate_limit, "preaim"),
+            spray_accuracy = nil,
+            counter_strafing = nil,
+        },
+        recent_matches = recent_matches,
+    }
+end
+
+function get_leetify_profile(steamId)
+    if not valid_steam_id(steamId) then
+        return encode({ status = "error", message = "Invalid SteamID64." })
+    end
+
+    local headers = { ["Accept"] = "application/json" }
+    local api_key = trimmed_config("leetify_api_key")
+    if api_key ~= nil then
+        headers["_leetify_key"] = api_key
+    end
+
+    local url = "https://api-public.cs-prod.leetify.com/v3/profile?steam64_id=" .. steamId
+    local profile, status, request_error = request_json(url, headers)
+    if profile == nil then
+        if status ~= 404 then
+            return provider_error("Leetify", status, request_error)
+        end
+
+        -- Leetify's public v3 endpoint omits some unregistered/legacy profiles
+        -- even though their public profile page still exposes recent ratings.
+        -- This is the same keyless endpoint used by Leetify's own web client.
+        local legacy_url = "https://api.cs-prod.leetify.com/api/profile/id/" .. steamId
+        local legacy_headers = {
+            ["Accept"] = "application/json",
+            ["Origin"] = "https://leetify.com",
+            ["Referer"] = "https://leetify.com/",
+        }
+        local legacy_profile, legacy_status, legacy_error = request_json(legacy_url, legacy_headers)
+        if legacy_profile == nil then
+            return provider_error("Leetify legacy profile", legacy_status, legacy_error)
+        end
+
+        local legacy_ratings = type(legacy_profile.recentGameRatings) == "table" and legacy_profile.recentGameRatings or {}
+        local legacy_games = type(legacy_profile.games) == "table" and legacy_profile.games or {}
+        if next(legacy_ratings) == nil and #legacy_games == 0 then
+            return encode({ status = "not_found", message = "Leetify has no public matches for this Steam account." })
+        end
+
+        local normalized_profile = normalize_legacy_leetify_profile(legacy_profile, steamId)
+        if normalized_profile.stats.reaction_time_ms == nil then
+            local damage_time_min_ms, damage_time_max_ms, scope_url = get_scope_damage_time(steamId)
+            normalized_profile.stats.damage_time_min_ms = damage_time_min_ms
+            normalized_profile.stats.damage_time_max_ms = damage_time_max_ms
+            normalized_profile.stats.damage_time_source_url = scope_url
+        end
+
+        logger:info("Using Leetify web profile fallback for SteamID64 " .. steamId)
+        return encode({
+            status = "ok",
+            data = normalized_profile,
+            fetched_at = os.time(),
+        })
+    end
+
+    if profile.privacy_mode ~= nil and profile.privacy_mode ~= cjson.null and profile.privacy_mode ~= "public" then
+        return encode({ status = "private", message = "This Leetify profile is private." })
+    end
+
     return encode({
         status = "ok",
-        data = {
-            name = optional(profile.name),
-            steam64_id = steamId,
-            profile_id = optional(profile.id),
-            privacy_mode = optional(profile.privacy_mode),
-            winrate = optional(profile.winrate),
-            total_matches = optional(profile.total_matches),
-            first_match_date = optional(profile.first_match_date),
-            ranks = {
-                premier = optional(ranks.premier),
-                faceit = optional(ranks.faceit),
-                faceit_elo = optional(ranks.faceit_elo),
-                leetify = optional(ranks.leetify),
-            },
-            rating = {
-                aim = optional(rating.aim),
-                positioning = optional(rating.positioning),
-                utility = optional(rating.utility),
-                clutch = optional(rating.clutch),
-                opening = optional(rating.opening),
-            },
-            stats = {
-                reaction_time_ms = optional(stats.reaction_time_ms),
-                preaim = optional(stats.preaim),
-                spray_accuracy = optional(stats.spray_accuracy),
-                counter_strafing = optional(stats.counter_strafing_good_shots_ratio),
-            },
-            recent_matches = recent_matches,
-        },
+        data = normalize_public_leetify_profile(profile, steamId),
         fetched_at = os.time(),
     })
 end
