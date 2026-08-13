@@ -3,7 +3,7 @@ local http = require("http")
 local logger = require("logger")
 local millennium = require("millennium")
 
-local PLUGIN_VERSION = "0.1.0"
+local PLUGIN_VERSION = "0.2.0"
 local USER_AGENT = "millennium-cs2-profile-stats/" .. PLUGIN_VERSION
 
 local function encode(payload)
@@ -146,6 +146,7 @@ function get_leetify_profile(steamId)
 
     local ranks = type(profile.ranks) == "table" and profile.ranks or {}
     local rating = type(profile.rating) == "table" and profile.rating or {}
+    local stats = type(profile.stats) == "table" and profile.stats or {}
     local recent_matches = {}
 
     if type(profile.recent_matches) == "table" then
@@ -181,11 +182,53 @@ function get_leetify_profile(steamId)
                 aim = optional(rating.aim),
                 positioning = optional(rating.positioning),
                 utility = optional(rating.utility),
+                clutch = optional(rating.clutch),
+                opening = optional(rating.opening),
+            },
+            stats = {
+                reaction_time_ms = optional(stats.reaction_time_ms),
+                preaim = optional(stats.preaim),
+                spray_accuracy = optional(stats.spray_accuracy),
+                counter_strafing = optional(stats.counter_strafing_good_shots_ratio),
             },
             recent_matches = recent_matches,
         },
         fetched_at = os.time(),
     })
+end
+
+local function faceit_lifetime_map(payload)
+    if type(payload) ~= "table" then
+        return {}
+    end
+
+    local lifetime = payload.lifetime or payload.lifetime_stats
+    if type(lifetime) ~= "table" and type(payload.payload) == "table" then
+        lifetime = payload.payload.lifetime or payload.payload.lifetime_stats
+    end
+    if type(lifetime) ~= "table" then
+        return {}
+    end
+
+    local result = {}
+    for key, value in pairs(lifetime) do
+        if type(key) == "string" then
+            result[key] = value
+        elseif type(value) == "table" and type(value.key) == "string" then
+            result[value.key] = optional(value.value)
+        end
+    end
+    return result
+end
+
+local function first_lifetime_value(lifetime, keys)
+    for _, key in ipairs(keys) do
+        local value = optional(lifetime[key])
+        if value ~= nil and tostring(value) ~= "" then
+            return value
+        end
+    end
+    return nil
 end
 
 function get_faceit_profile(steamId)
@@ -210,28 +253,46 @@ function get_faceit_profile(steamId)
         return encode({ status = "not_found", message = "No FACEIT CS2 account was found." })
     end
 
-    local stats_url = "https://faceit-finder.com/id/" .. steamId .. "?lang=en"
-    local stats_response, stats_error = http.get(stats_url, {
-        headers = { ["Accept"] = "text/html" },
-        timeout = 12,
-        follow_redirects = true,
-        verify_ssl = true,
-        user_agent = USER_AGENT,
-    })
     local lifetime = {}
+    local stats_api_url = "https://api.faceit.com/stats/v1/stats/users/" .. tostring(player.player_id) .. "/games/cs2"
+    local stats_payload, stats_status, stats_error = request_json(stats_api_url, {
+        ["Accept"] = "application/json",
+        ["Origin"] = "https://www.faceit.com",
+        ["Referer"] = "https://www.faceit.com/",
+    })
+
+    if stats_payload ~= nil then
+        lifetime = faceit_lifetime_map(stats_payload)
+    end
+
+    local stats_response = nil
+    local html_error = nil
     local partial_message = nil
 
-    if stats_response ~= nil and stats_response.status == 200 then
-        local hero = stats_response.body:match("Kluczowe liczby.-ELO Rating") or stats_response.body:match("Key numbers.-ELO Rating") or stats_response.body
-        lifetime.matches = hero:match(">Matches</p>%s*<p[^>]*>([^<]+)</p>")
-        lifetime.winrate = hero:match(">Win Rate</p>%s*<p[^>]*>([^<]+)</p>")
-        lifetime.kd = hero:match(">K/D</p>%s*<p[^>]*>([^<]+)</p>")
-        lifetime.adr = hero:match(">ADR</p>%s*<p[^>]*>([^<]+)</p>")
-        lifetime.headshots = hero:match(">HS %%</p>%s*<p[^>]*>([^<]+)</p>")
-    else
+    if next(lifetime) == nil then
+        local stats_url = "https://faceit-finder.com/id/" .. steamId .. "?lang=en"
+        stats_response, html_error = http.get(stats_url, {
+            headers = { ["Accept"] = "text/html" },
+            timeout = 12,
+            follow_redirects = true,
+            verify_ssl = true,
+            user_agent = USER_AGENT,
+        })
+
+        if stats_response ~= nil and stats_response.status == 200 then
+            local hero = stats_response.body:match("Kluczowe liczby.-ELO Rating") or stats_response.body:match("Key numbers.-ELO Rating") or stats_response.body
+            lifetime.matches = hero:match(">Matches</p>%s*<p[^>]*>([^<]+)</p>")
+            lifetime.winrate = hero:match(">Win Rate</p>%s*<p[^>]*>([^<]+)</p>")
+            lifetime.kd = hero:match(">K/D</p>%s*<p[^>]*>([^<]+)</p>")
+            lifetime.adr = hero:match(">ADR</p>%s*<p[^>]*>([^<]+)</p>")
+            lifetime.headshots = hero:match(">HS %%</p>%s*<p[^>]*>([^<]+)</p>")
+        end
+    end
+
+    if next(lifetime) == nil then
         partial_message = "FACEIT profile loaded, but lifetime statistics are unavailable."
-        local stats_status = stats_response and stats_response.status or 0
-        logger:warn("FACEIT stats page failed (" .. tostring(stats_status) .. "): " .. tostring(stats_error))
+        local html_status = stats_response and stats_response.status or 0
+        logger:warn("FACEIT lifetime stats unavailable (API " .. tostring(stats_status) .. ", HTML " .. tostring(html_status) .. "): " .. tostring(stats_error or html_error))
     end
 
     return encode({
@@ -244,11 +305,11 @@ function get_faceit_profile(steamId)
             level = optional(cs2.skill_level),
             elo = optional(cs2.faceit_elo),
             stats = {
-                matches = optional(lifetime.matches),
-                kd = optional(lifetime.kd),
-                adr = optional(lifetime.adr),
-                headshots = optional(lifetime.headshots),
-                winrate = optional(lifetime.winrate),
+                matches = optional(lifetime.matches) or first_lifetime_value(lifetime, { "Matches", "matches" }),
+                kd = optional(lifetime.kd) or first_lifetime_value(lifetime, { "Average K/D Ratio", "K/D Ratio", "K/D", "kd" }),
+                adr = optional(lifetime.adr) or first_lifetime_value(lifetime, { "ADR", "Average Damage Per Round", "adr" }),
+                headshots = optional(lifetime.headshots) or first_lifetime_value(lifetime, { "Average Headshots %", "Headshots %", "HS %", "headshots" }),
+                winrate = optional(lifetime.winrate) or first_lifetime_value(lifetime, { "Win Rate %", "Winrate", "winrate" }),
                 recent_results = {},
             },
         },

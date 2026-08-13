@@ -39,6 +39,14 @@ type LeetifyProfile = {
 		aim?: number;
 		positioning?: number;
 		utility?: number;
+		clutch?: number;
+		opening?: number;
+	};
+	stats: {
+		reaction_time_ms?: number;
+		preaim?: number;
+		spray_accuracy?: number;
+		counter_strafing?: number;
 	};
 	recent_matches: Array<{
 		outcome?: string;
@@ -138,6 +146,16 @@ const formatWinrate = (value: unknown) => {
 	return `${formatMetric(parsed <= 1 ? parsed * 100 : parsed, 1)}%`;
 };
 
+const formatMilliseconds = (value: unknown) => {
+	const parsed = finiteNumber(value);
+	return parsed === undefined ? '—' : `${formatInteger(parsed)} ms`;
+};
+
+const formatPercent = (value: unknown) => {
+	const parsed = finiteNumber(value);
+	return parsed === undefined ? '—' : `${formatMetric(parsed, 1)}%`;
+};
+
 const statusMessage = (provider: 'Leetify' | 'FACEIT', response: ProviderResponse<unknown>) => {
 	if (response.status === 'loading') return `Loading ${provider}…`;
 	if (response.status === 'not_found') return `${provider} profile not found.`;
@@ -146,10 +164,34 @@ const statusMessage = (provider: 'Leetify' | 'FACEIT', response: ProviderRespons
 	return response.message || `${provider} data is unavailable.`;
 };
 
-const metric = (label: string, value: string, modifier = '') => `
+type MetricIcon = 'aim' | 'reaction' | 'winrate' | 'premier' | 'rating';
+
+const metricIcon = (name: MetricIcon) => {
+	const icons: Record<MetricIcon, string> = {
+		aim: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="5"></circle><path d="M12 2v4M12 18v4M2 12h4M18 12h4"></path><circle cx="12" cy="12" r="1"></circle></svg>',
+		reaction: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M13 2 5.5 13h6L11 22l7.5-12h-6L13 2Z"></path></svg>',
+		winrate: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 16.5 9 11l4 3 7-8"></path><path d="M15 6h5v5"></path></svg>',
+		premier: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 7 3v5c0 4.7-2.8 8-7 10-4.2-2-7-5.3-7-10V6l7-3Z"></path><path d="m9.5 12 1.7 1.7 3.6-4"></path></svg>',
+		rating: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 2.7 5.5 6.1.9-4.4 4.3 1 6.1-5.4-2.9-5.4 2.9 1-6.1-4.4-4.3 6.1-.9L12 3Z"></path></svg>',
+	};
+	return icons[name];
+};
+
+const metric = (icon: MetricIcon, label: string, value: string, modifier = '') => `
 	<div class="cs2ps-metric ${modifier}">
-		<span class="cs2ps-metric-label">${escapeHtml(label)}</span>
-		<strong class="cs2ps-metric-value">${escapeHtml(value)}</strong>
+		<span class="cs2ps-metric-icon">${metricIcon(icon)}</span>
+		<span class="cs2ps-metric-copy">
+			<span class="cs2ps-metric-label">${escapeHtml(label)}</span>
+			<strong class="cs2ps-metric-value">${escapeHtml(value)}</strong>
+		</span>
+	</div>
+`;
+
+const rankPill = (icon: 'premier' | 'rating', label: string, value: string, modifier: string) => `
+	<div class="cs2ps-rank-pill ${modifier}">
+		<span class="cs2ps-rank-icon">${metricIcon(icon)}</span>
+		<span class="cs2ps-rank-label">${escapeHtml(label)}</span>
+		<strong>${escapeHtml(value)}</strong>
 	</div>
 `;
 
@@ -196,9 +238,18 @@ const renderDetails = (state: ViewState, steamId: string) => {
 				<section class="cs2ps-detail-section">
 					<div class="cs2ps-detail-heading"><span>Leetify</span><a href="${leetifyUrl}" target="_blank" rel="noopener">View on Leetify ↗</a></div>
 					<div class="cs2ps-detail-grid">
+						${detailedMetric('Premier', formatInteger(leetify.ranks.premier))}
+						${detailedMetric('Leetify rating', formatLeetifyRating(leetify.ranks.leetify))}
+						${detailedMetric('Matches', formatInteger(leetify.total_matches))}
 						${detailedMetric('Aim', formatMetric(leetify.rating.aim))}
+						${detailedMetric('Time to damage', formatMilliseconds(leetify.stats.reaction_time_ms))}
+						${detailedMetric('Winrate', formatWinrate(leetify.winrate))}
 						${detailedMetric('Positioning', formatMetric(leetify.rating.positioning))}
 						${detailedMetric('Utility', formatMetric(leetify.rating.utility))}
+						${detailedMetric('Preaim', formatMetric(leetify.stats.preaim))}
+						${detailedMetric('Spray accuracy', formatPercent(leetify.stats.spray_accuracy))}
+						${detailedMetric('Counter-strafing', formatPercent(leetify.stats.counter_strafing))}
+						${detailedMetric('Opening', formatMetric(leetify.rating.opening, 2))}
 					</div>
 				</section>
 			`
@@ -209,13 +260,16 @@ const renderDetails = (state: ViewState, steamId: string) => {
 			? `
 				<section class="cs2ps-detail-section">
 					<div class="cs2ps-detail-heading"><span>FACEIT · ${escapeHtml(faceit.nickname || 'Player')}</span>${faceitUrl ? `<a href="${faceitUrl}" target="_blank" rel="noopener">View on FACEIT ↗</a>` : ''}</div>
-					<div class="cs2ps-detail-grid cs2ps-detail-grid-five">
+					<div class="cs2ps-detail-grid">
+						${detailedMetric('Level', formatInteger(faceit.level))}
+						${detailedMetric('ELO', formatInteger(faceit.elo))}
 						${detailedMetric('K/D', faceit.stats.kd || '—')}
 						${detailedMetric('ADR', faceit.stats.adr || '—')}
 						${detailedMetric('HS', faceit.stats.headshots || '—')}
 						${detailedMetric('Winrate', faceit.stats.winrate || '—')}
 						${detailedMetric('Matches', faceit.stats.matches || '—')}
 					</div>
+					${state.faceit.message ? `<p class="cs2ps-detail-note">${escapeHtml(state.faceit.message)}</p>` : ''}
 					<a class="cs2ps-source-link" href="${finderUrl}" target="_blank" rel="noopener">FACEIT lookup via Faceit Finder ↗</a>
 				</section>
 			`
@@ -249,28 +303,40 @@ const renderDetails = (state: ViewState, steamId: string) => {
 const renderCard = (root: HTMLElement, state: ViewState, steamId: string) => {
 	const leetify = state.leetify.data;
 	const faceit = state.faceit.data;
-	const faceitLevel = faceit?.level ?? leetify?.ranks.faceit;
-	const faceitElo = faceit?.elo ?? leetify?.ranks.faceit_elo;
-	const faceitValue = faceitLevel ? `LVL ${formatInteger(faceitLevel)}${faceitElo ? ` · ${formatInteger(faceitElo)}` : ''}` : '—';
 	const isLoading = state.leetify.status === 'loading' || state.faceit.status === 'loading';
+	const faceitFound = state.faceit.status === 'ok' || Boolean(faceit?.level) || Boolean(leetify?.ranks.faceit);
+	const faceitFinished = state.faceit.status !== 'loading' && state.leetify.status !== 'loading';
+	const faceitStatus = faceitFound
+		? { modifier: 'cs2ps-faceit-found', text: 'FACEIT account found' }
+		: !faceitFinished
+			? { modifier: 'cs2ps-faceit-loading', text: 'Checking FACEIT account…' }
+			: state.faceit.status === 'not_found'
+				? { modifier: 'cs2ps-faceit-missing', text: 'No FACEIT account' }
+				: { modifier: 'cs2ps-faceit-unknown', text: 'FACEIT status unavailable' };
 
 	root.innerHTML = `
 		<div class="cs2ps-card ${state.expanded ? 'cs2ps-is-expanded' : ''}">
 			<button class="cs2ps-header" type="button" aria-expanded="${state.expanded}">
-				<span class="cs2ps-title"><span class="cs2ps-title-mark"></span>CS2 STATS</span>
+				<span class="cs2ps-title"><span class="cs2ps-title-mark">${metricIcon('aim')}</span><span>CS2 PERFORMANCE</span></span>
 				<span class="cs2ps-header-meta">${isLoading ? '<span class="cs2ps-spinner"></span>' : ''}<span>${state.expanded ? 'Hide' : 'Details'}</span><span class="cs2ps-chevron">⌄</span></span>
 			</button>
+			<div class="cs2ps-rank-row">
+				${rankPill('premier', 'Premier', formatInteger(leetify?.ranks.premier), 'cs2ps-rank-premier')}
+				${rankPill('rating', 'Leetify', formatLeetifyRating(leetify?.ranks.leetify), 'cs2ps-rank-leetify')}
+			</div>
 			<div class="cs2ps-summary-grid">
-				${metric('Premier', formatInteger(leetify?.ranks.premier), 'cs2ps-accent-premier')}
-				${metric('FACEIT', faceitValue, 'cs2ps-accent-faceit')}
-				${metric('Leetify Rating', formatLeetifyRating(leetify?.ranks.leetify), 'cs2ps-accent-leetify')}
-				${metric('Aim', formatMetric(leetify?.rating.aim), 'cs2ps-accent-aim')}
-				${metric('Winrate', formatWinrate(leetify?.winrate))}
-				${metric('Matches', formatInteger(leetify?.total_matches))}
+				${metric('aim', 'Aim', formatMetric(leetify?.rating.aim), 'cs2ps-accent-aim')}
+				${metric('reaction', 'Time to DMG', formatMilliseconds(leetify?.stats.reaction_time_ms), 'cs2ps-accent-reaction')}
+				${metric('winrate', 'Winrate', formatWinrate(leetify?.winrate), 'cs2ps-accent-winrate')}
 			</div>
 			<div class="cs2ps-form-row">
 				<span class="cs2ps-form-label">FORM</span>
 				<div class="cs2ps-form">${renderForm(leetify?.recent_matches)}</div>
+			</div>
+			<div class="cs2ps-faceit-status ${faceitStatus.modifier}">
+				<span class="cs2ps-faceit-mark">F</span>
+				<span>${faceitStatus.text}</span>
+				${faceitFound ? '<span class="cs2ps-faceit-check">✓</span>' : ''}
 			</div>
 			${renderDetails(state, steamId)}
 		</div>
