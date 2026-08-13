@@ -15,7 +15,7 @@
     },
     "type": "module",
     "name": "millennium-cs2-profile-stats",
-    "version": "0.2.2",
+    "version": "0.3.0",
     "description": "Useful CS2 statistics directly on Steam profile pages.",
     "main": "./frontend/index.tsx",
     "author": "Shightrox",

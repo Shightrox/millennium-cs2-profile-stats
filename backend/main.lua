@@ -3,7 +3,7 @@ local http = require("http")
 local logger = require("logger")
 local millennium = require("millennium")
 
-local PLUGIN_VERSION = "0.2.2"
+local PLUGIN_VERSION = "0.3.0"
 local USER_AGENT = "millennium-cs2-profile-stats/" .. PLUGIN_VERSION
 
 local function encode(payload)
@@ -161,6 +161,8 @@ local function normalize_public_leetify_profile(profile, steam_id)
                     outcome = optional(match.outcome),
                     map_name = optional(match.map_name),
                     finished_at = optional(match.finished_at),
+                    score = optional(match.score),
+                    data_source = optional(match.data_source),
                 }
             end
         end
@@ -356,6 +358,8 @@ local function normalize_legacy_leetify_profile(profile, steam_id)
                 outcome = optional(match.matchResult),
                 map_name = optional(match.mapName),
                 finished_at = optional(match.gameFinishedAt),
+                score = optional(match.scores),
+                data_source = optional(match.dataSource),
             }
         end
     end

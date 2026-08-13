@@ -9,10 +9,10 @@ A compact CS2 statistics card embedded directly into Steam Community profile pag
 - Current Premier rating
 - FACEIT level and ELO
 - Leetify Rating, Aim, Positioning, and Utility
-- Leetify winrate, match count, and recent form
+- Leetify winrate, match count, and recent match history with map, date, and score
 - FACEIT lifetime K/D, ADR, HS%, winrate, and match count
 - Public Steam CS2 hours, recent hours, and account creation date
-- Compact and expanded layouts
+- Compact summary plus separate Overview, Matches, FACEIT, and Steam detail tabs
 - Independent provider loading: one unavailable source does not hide the others
 - Works without mandatory API keys
 

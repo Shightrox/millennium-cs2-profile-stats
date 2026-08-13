@@ -55,6 +55,8 @@ type LeetifyProfile = {
 		outcome?: string;
 		map_name?: string;
 		finished_at?: string;
+		score?: number[];
+		data_source?: string;
 	}>;
 };
 
@@ -89,12 +91,15 @@ type Preferences = {
 	expand_details: boolean;
 };
 
+type DetailTab = 'overview' | 'matches' | 'faceit' | 'steam';
+
 type ViewState = {
 	leetify: ProviderResponse<LeetifyProfile>;
 	faceit: ProviderResponse<FaceitProfile>;
 	steam: SteamProfile;
 	preferences: Preferences;
 	expanded: boolean;
+	activeTab: DetailTab;
 };
 
 const getLeetifyProfile = callable<[{ steamId: string }], string>('get_leetify_profile');
@@ -204,52 +209,76 @@ const statusMessage = (provider: 'Leetify' | 'FACEIT', response: ProviderRespons
 	return `${provider} data is unavailable.`;
 };
 
-type MetricIcon = 'aim' | 'reaction' | 'winrate' | 'premier' | 'rating';
+type MetricIcon = 'aim' | 'reaction' | 'winrate' | 'premier';
 
 const metricIcon = (name: MetricIcon) => {
 	const icons: Record<MetricIcon, string> = {
 		aim: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="5"></circle><path d="M12 2v4M12 18v4M2 12h4M18 12h4"></path><circle cx="12" cy="12" r="1"></circle></svg>',
 		reaction: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M13 2 5.5 13h6L11 22l7.5-12h-6L13 2Z"></path></svg>',
 		winrate: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 16.5 9 11l4 3 7-8"></path><path d="M15 6h5v5"></path></svg>',
-		premier: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 7 3v5c0 4.7-2.8 8-7 10-4.2-2-7-5.3-7-10V6l7-3Z"></path><path d="m9.5 12 1.7 1.7 3.6-4"></path></svg>',
-		rating: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 2.7 5.5 6.1.9-4.4 4.3 1 6.1-5.4-2.9-5.4 2.9 1-6.1-4.4-4.3 6.1-.9L12 3Z"></path></svg>',
+		premier: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 7 3v5c0 4.7-2.8 8-7 10-4.2-2-7-5.3-7-10V6l7-3Z"></path></svg>',
 	};
 	return icons[name];
 };
 
-const metric = (icon: MetricIcon, label: string, value: string, modifier = '') => `
-	<div class="cs2ps-metric ${modifier}">
-		<span class="cs2ps-metric-icon">${metricIcon(icon)}</span>
-		<span class="cs2ps-metric-copy">
-			<span class="cs2ps-metric-label">${escapeHtml(label)}</span>
-			<strong class="cs2ps-metric-value">${escapeHtml(value)}</strong>
-		</span>
+const hasValue = (value: unknown) => value !== undefined && value !== null && String(value).trim() !== '';
+
+const formatSignedMetric = (value: unknown, maximumFractionDigits = 1) => {
+	const parsed = finiteNumber(value);
+	if (parsed === undefined) return '—';
+	return `${parsed > 0 ? '+' : ''}${formatMetric(parsed, maximumFractionDigits)}`;
+};
+
+const compactMetric = (icon: MetricIcon, label: string, value: string) => `
+	<div class="cs2ps-metric">
+		<span class="cs2ps-metric-label"><span class="cs2ps-metric-icon">${metricIcon(icon)}</span>${escapeHtml(label)}</span>
+		<strong class="cs2ps-metric-value">${escapeHtml(value)}</strong>
 	</div>
 `;
 
-const rankPill = (icon: 'premier' | 'rating', label: string, value: string, modifier: string) => `
-	<div class="cs2ps-rank-pill ${modifier}">
-		<span class="cs2ps-rank-icon">${metricIcon(icon)}</span>
-		<span class="cs2ps-rank-label">${escapeHtml(label)}</span>
-		<strong>${escapeHtml(value)}</strong>
-	</div>
-`;
-
-const detailedMetric = (label: string, value: string) => `
-	<div class="cs2ps-detail-metric">
-		<span>${escapeHtml(label)}</span>
-		<strong>${escapeHtml(value)}</strong>
-	</div>
+const detailStat = (label: string, value: string) => `
+	<div class="cs2ps-detail-stat"><span>${escapeHtml(label)}</span><strong>${escapeHtml(value)}</strong></div>
 `;
 
 const detailedRow = (label: string, value: string) => `
-	<div class="cs2ps-detail-row">
-		<span>${escapeHtml(label)}</span>
-		<strong>${escapeHtml(value)}</strong>
-	</div>
+	<div class="cs2ps-detail-row"><span>${escapeHtml(label)}</span><strong>${escapeHtml(value)}</strong></div>
 `;
 
-const hasValue = (value: unknown) => value !== undefined && value !== null && String(value).trim() !== '';
+const formatMapName = (value: string | undefined) => {
+	if (!value) return 'Unknown map';
+	const normalized = value.toLowerCase().replace(/^de_/, '');
+	const names: Record<string, string> = {
+		dust2: 'Dust II',
+		mirage: 'Mirage',
+		inferno: 'Inferno',
+		nuke: 'Nuke',
+		ancient: 'Ancient',
+		anubis: 'Anubis',
+		overpass: 'Overpass',
+		vertigo: 'Vertigo',
+		train: 'Train',
+		cache: 'Cache',
+	};
+	return names[normalized] || normalized.replace(/(^|[_-])([a-z])/g, (_, separator: string, letter: string) => `${separator ? ' ' : ''}${letter.toUpperCase()}`);
+};
+
+const formatMatchDate = (value: string | undefined) => {
+	if (!value) return '';
+	const date = new Date(value);
+	if (Number.isNaN(date.getTime())) return '';
+	return date.toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
+};
+
+const formatDataSource = (value: string | undefined) => {
+	if (!value) return '';
+	const normalized = value.toLowerCase();
+	if (normalized.includes('faceit')) return 'FACEIT';
+	if (normalized.includes('matchmaking')) return 'Matchmaking';
+	return value.replace(/[_-]+/g, ' ');
+};
+
+const formatScore = (score: number[] | undefined) =>
+	Array.isArray(score) && score.length >= 2 ? `${formatInteger(score[0])}:${formatInteger(score[1])}` : '—';
 
 const renderForm = (matches: LeetifyProfile['recent_matches'] | undefined) => {
 	if (!matches?.length) return '<span class="cs2ps-form-empty">No recent matches</span>';
@@ -259,9 +288,7 @@ const renderForm = (matches: LeetifyProfile['recent_matches'] | undefined) => {
 		.map((match) => {
 			const outcome = match.outcome?.toLowerCase();
 			const result = outcome === 'win' ? 'W' : outcome === 'loss' ? 'L' : '•';
-			const title = [match.map_name?.replace(/^de_/, ''), match.finished_at ? new Date(match.finished_at).toLocaleDateString() : '']
-				.filter(Boolean)
-				.join(' · ');
+			const title = [formatMapName(match.map_name), formatMatchDate(match.finished_at)].filter(Boolean).join(' · ');
 			return `<span class="cs2ps-form-result cs2ps-form-${outcome === 'win' ? 'win' : outcome === 'loss' ? 'loss' : 'unknown'}" title="${escapeHtml(title)}">${result}</span>`;
 		})
 		.join('');
@@ -269,8 +296,51 @@ const renderForm = (matches: LeetifyProfile['recent_matches'] | undefined) => {
 
 const providerState = (provider: 'Leetify' | 'FACEIT', response: ProviderResponse<unknown>) => `
 	<div class="cs2ps-provider-state cs2ps-provider-${escapeHtml(response.status)}">
-		<span class="cs2ps-provider-dot"></span>
-		<span>${escapeHtml(statusMessage(provider, response))}</span>
+		<span class="cs2ps-provider-dot"></span><span>${escapeHtml(statusMessage(provider, { ...response, message: undefined }))}</span>
+	</div>
+`;
+
+const renderRating = (profile: LeetifyProfile) => {
+	const premier = finiteNumber(profile.ranks.premier);
+	const leetify = finiteNumber(profile.ranks.leetify);
+	if (premier !== undefined) {
+		return `
+			<div class="cs2ps-rating cs2ps-rating-premier">
+				<div class="cs2ps-premier-emblem"><span class="cs2ps-premier-icon">${metricIcon('premier')}</span><span>Premier</span><strong>${escapeHtml(formatInteger(premier))}</strong></div>
+				<div class="cs2ps-secondary-rating"><span>Leetify rating</span><strong>${escapeHtml(formatLeetifyRating(leetify))}</strong><small>${escapeHtml(formatInteger(profile.total_matches))} tracked matches</small></div>
+			</div>
+		`;
+	}
+
+	const ratingPosition = leetify === undefined ? 50 : Math.max(3, Math.min(97, ((leetify + 10) / 20) * 100));
+	return `
+		<div class="cs2ps-rating cs2ps-rating-leetify">
+			<div class="cs2ps-rating-copy"><span>Leetify rating</span><strong>${escapeHtml(formatLeetifyRating(leetify))}</strong><small>Recent performance</small></div>
+			<div class="cs2ps-rating-scale" aria-label="Leetify rating scale from minus 10 to plus 10">
+				<span class="cs2ps-scale-line"></span><span class="cs2ps-scale-zero"></span><span class="cs2ps-scale-dot" style="left:${ratingPosition}%"></span>
+				<span class="cs2ps-scale-labels"><span>−10</span><span>0</span><span>+10</span></span>
+			</div>
+		</div>
+	`;
+};
+
+const renderMatchList = (matches: LeetifyProfile['recent_matches']) => `
+	<div class="cs2ps-match-list">
+		${matches
+			.slice(0, 5)
+			.map((match) => {
+				const outcome = match.outcome?.toLowerCase();
+				const result = outcome === 'win' ? 'W' : outcome === 'loss' ? 'L' : '•';
+				const meta = [formatMatchDate(match.finished_at), formatDataSource(match.data_source)].filter(Boolean).join(' · ');
+				return `
+					<div class="cs2ps-match">
+						<span class="cs2ps-match-result cs2ps-form-${outcome === 'win' ? 'win' : outcome === 'loss' ? 'loss' : 'unknown'}">${result}</span>
+						<span class="cs2ps-match-copy"><strong>${escapeHtml(formatMapName(match.map_name))}</strong><small>${escapeHtml(meta || 'Recent match')}</small></span>
+						<strong class="cs2ps-match-score">${escapeHtml(formatScore(match.score))}</strong>
+					</div>
+				`;
+			})
+			.join('')}
 	</div>
 `;
 
@@ -279,76 +349,62 @@ const renderDetails = (state: ViewState, steamId: string) => {
 	const faceit = state.faceit.data;
 	const leetifyUrl = `https://leetify.com/app/profile/${encodeURIComponent(steamId)}`;
 	const faceitUrl = faceit?.nickname ? `https://www.faceit.com/en/players/${encodeURIComponent(faceit.nickname)}` : undefined;
-	const hasFaceitLifetime = Boolean(
-		faceit && [faceit.stats.kd, faceit.stats.adr, faceit.stats.headshots, faceit.stats.winrate, faceit.stats.matches].some(hasValue),
-	);
+	const tabs: Array<{ id: DetailTab; label: string }> = [{ id: 'overview', label: 'Overview' }];
+	if (leetify?.recent_matches.length) tabs.push({ id: 'matches', label: 'Matches' });
+	if (state.faceit.status === 'ok' && faceit) tabs.push({ id: 'faceit', label: 'FACEIT' });
+	if (state.preferences.show_steam_details) tabs.push({ id: 'steam', label: 'Steam' });
+	if (!tabs.some((tab) => tab.id === state.activeTab)) state.activeTab = tabs[0].id;
+
+	const supplementalStats = leetify
+		? [
+				hasValue(leetify.rating.positioning) ? detailStat('Positioning', formatMetric(leetify.rating.positioning)) : '',
+				hasValue(leetify.rating.utility) ? detailStat('Utility', formatMetric(leetify.rating.utility)) : '',
+				hasValue(leetify.rating.opening) ? detailStat('Opening', formatSignedMetric(leetify.rating.opening, 2)) : '',
+				hasValue(leetify.rating.clutch) ? detailStat('Clutch', formatSignedMetric(leetify.rating.clutch, 1)) : '',
+				hasValue(leetify.stats.preaim) ? detailStat('Preaim', formatMetric(leetify.stats.preaim)) : '',
+				hasValue(leetify.stats.spray_accuracy) ? detailStat('Spray accuracy', formatPercent(leetify.stats.spray_accuracy)) : '',
+				hasValue(leetify.stats.counter_strafing) ? detailStat('Counter-strafing', formatPercent(leetify.stats.counter_strafing)) : '',
+			].filter(Boolean).join('')
+		: '';
 	const hasScopeDamageTime = hasValue(leetify?.stats.damage_time_min_ms) && hasValue(leetify?.stats.damage_time_max_ms);
-
-	const leetifySection =
-		state.leetify.status === 'ok' && leetify
-			? `
-				<section class="cs2ps-detail-section">
-					<div class="cs2ps-detail-heading"><span>Leetify</span><a href="${leetifyUrl}" target="_blank" rel="noopener">View on Leetify ↗</a></div>
-					<div class="cs2ps-detail-grid">
-						${detailedMetric('Premier', formatInteger(leetify.ranks.premier))}
-						${detailedMetric('Leetify rating', formatLeetifyRating(leetify.ranks.leetify))}
-						${detailedMetric('Matches', formatInteger(leetify.total_matches))}
-						${detailedMetric('Aim', formatMetric(leetify.rating.aim))}
-						${hasScopeDamageTime ? detailedMetric('AWP time to damage', formatSecondsRange(leetify.stats.damage_time_min_ms, leetify.stats.damage_time_max_ms)) : detailedMetric('Reaction time', formatMilliseconds(leetify.stats.reaction_time_ms))}
-						${detailedMetric('Winrate', formatWinrate(leetify.winrate))}
-						${detailedMetric('Positioning', formatMetric(leetify.rating.positioning))}
-						${detailedMetric('Utility', formatMetric(leetify.rating.utility))}
-						${detailedMetric('Preaim', formatMetric(leetify.stats.preaim))}
-						${detailedMetric('Spray accuracy', formatPercent(leetify.stats.spray_accuracy))}
-						${detailedMetric('Counter-strafing', formatPercent(leetify.stats.counter_strafing))}
-						${detailedMetric('Opening', formatMetric(leetify.rating.opening, 2))}
-					</div>
-					${hasScopeDamageTime && leetify.stats.damage_time_source_url ? `<a class="cs2ps-source-link" href="${escapeHtml(leetify.stats.damage_time_source_url)}" target="_blank" rel="noopener">AWP timing provided by SCOPE.GG ↗</a>` : ''}
-				</section>
-			`
-			: providerState('Leetify', state.leetify);
-
-	const faceitSection =
-		state.faceit.status === 'ok' && faceit
-			? `
-				<section class="cs2ps-detail-section">
-					<div class="cs2ps-detail-heading"><span>FACEIT · ${escapeHtml(faceit.nickname || 'Player')}</span>${faceitUrl ? `<a href="${faceitUrl}" target="_blank" rel="noopener">View on FACEIT ↗</a>` : ''}</div>
-					<div class="cs2ps-detail-grid">
-						${detailedMetric('Level', formatInteger(faceit.level))}
-						${detailedMetric('ELO', formatInteger(faceit.elo))}
-						${detailedMetric('Region', (faceit.region || faceit.country || '—').toUpperCase())}
-						${hasValue(faceit.stats.kd) ? detailedMetric('K/D', faceit.stats.kd!) : ''}
-						${hasValue(faceit.stats.adr) ? detailedMetric('ADR', faceit.stats.adr!) : ''}
-						${hasValue(faceit.stats.headshots) ? detailedMetric('HS', faceit.stats.headshots!) : ''}
-						${hasValue(faceit.stats.winrate) ? detailedMetric('Winrate', faceit.stats.winrate!) : ''}
-						${hasValue(faceit.stats.matches) ? detailedMetric('Matches', faceit.stats.matches!) : ''}
-					</div>
-					${!hasFaceitLifetime ? '<p class="cs2ps-detail-note">Lifetime statistics are unavailable from the public provider.</p>' : state.faceit.message ? `<p class="cs2ps-detail-note">${escapeHtml(state.faceit.message)}</p>` : ''}
-				</section>
-			`
-			: providerState('FACEIT', state.faceit);
-
-	const steamSection = state.preferences.show_steam_details
-		? `
-			<section class="cs2ps-detail-section">
-				<div class="cs2ps-detail-heading"><span>Steam</span></div>
-				<div class="cs2ps-detail-list">
-					${detailedRow('CS2 hours', state.steam.hours || 'Private')}
-					${detailedRow('Last 2 weeks', state.steam.recentHours || (state.steam.status === 'loading' ? 'Loading…' : 'Private'))}
-					${detailedRow('Member since', state.steam.memberSince || (state.steam.status === 'loading' ? 'Loading…' : 'Unknown'))}
-				</div>
-			</section>
-		`
+	const overviewPanel = `
+		<section class="cs2ps-panel ${state.activeTab === 'overview' ? 'cs2ps-panel-active' : ''}" data-panel="overview">
+			${state.leetify.status === 'ok' && leetify
+				? `<div class="cs2ps-panel-heading"><span>Performance details</span><a href="${leetifyUrl}" target="_blank" rel="noopener">Leetify ↗</a></div>
+					${supplementalStats ? `<div class="cs2ps-detail-stats">${supplementalStats}</div>` : '<p class="cs2ps-detail-note">No additional public metrics for this player.</p>'}
+					<div class="cs2ps-sources">
+						<a class="cs2ps-leetify-attribution" href="https://leetify.com/" target="_blank" rel="noopener"><img src="${leetifyBadge}" alt="Data Provided by Leetify"></a>
+						${hasScopeDamageTime && leetify.stats.damage_time_source_url ? `<a class="cs2ps-scope-source" href="${escapeHtml(leetify.stats.damage_time_source_url)}" target="_blank" rel="noopener">AWP timing · SCOPE.GG ↗</a>` : ''}
+					</div>`
+				: providerState('Leetify', state.leetify)}
+		</section>
+	`;
+	const matchesPanel = leetify?.recent_matches.length
+		? `<section class="cs2ps-panel ${state.activeTab === 'matches' ? 'cs2ps-panel-active' : ''}" data-panel="matches">${renderMatchList(leetify.recent_matches)}</section>`
+		: '';
+	const faceitStats = faceit
+		? [
+				detailStat('Level', formatInteger(faceit.level)),
+				detailStat('ELO', formatInteger(faceit.elo)),
+				hasValue(faceit.region || faceit.country) ? detailStat('Region', (faceit.region || faceit.country || '').toUpperCase()) : '',
+				hasValue(faceit.stats.kd) ? detailStat('K/D', faceit.stats.kd!) : '',
+				hasValue(faceit.stats.adr) ? detailStat('ADR', faceit.stats.adr!) : '',
+				hasValue(faceit.stats.headshots) ? detailStat('HS', faceit.stats.headshots!) : '',
+				hasValue(faceit.stats.winrate) ? detailStat('Win rate', faceit.stats.winrate!) : '',
+				hasValue(faceit.stats.matches) ? detailStat('Matches', faceit.stats.matches!) : '',
+			].filter(Boolean).join('')
+		: '';
+	const faceitPanel = state.faceit.status === 'ok' && faceit
+		? `<section class="cs2ps-panel ${state.activeTab === 'faceit' ? 'cs2ps-panel-active' : ''}" data-panel="faceit"><div class="cs2ps-panel-heading"><span>${escapeHtml(faceit.nickname || 'FACEIT player')}</span>${faceitUrl ? `<a href="${faceitUrl}" target="_blank" rel="noopener">FACEIT ↗</a>` : ''}</div><div class="cs2ps-detail-stats">${faceitStats}</div></section>`
+		: '';
+	const steamPanel = state.preferences.show_steam_details
+		? `<section class="cs2ps-panel ${state.activeTab === 'steam' ? 'cs2ps-panel-active' : ''}" data-panel="steam"><div class="cs2ps-detail-list">${detailedRow('CS2 hours', state.steam.hours || 'Private')}${detailedRow('Last 2 weeks', state.steam.recentHours || (state.steam.status === 'loading' ? 'Loading…' : 'Private'))}${detailedRow('Member since', state.steam.memberSince || (state.steam.status === 'loading' ? 'Loading…' : 'Unknown'))}</div></section>`
 		: '';
 
 	return `
 		<div class="cs2ps-details" ${state.expanded ? '' : 'hidden'}>
-			${leetifySection}
-			${faceitSection}
-			${steamSection}
-			<a class="cs2ps-leetify-attribution" href="https://leetify.com/" target="_blank" rel="noopener">
-				<img src="${leetifyBadge}" alt="Data Provided by Leetify">
-			</a>
+			<div class="cs2ps-tabs cs2ps-tabs-${tabs.length}">${tabs.map((tab) => `<button class="cs2ps-tab ${state.activeTab === tab.id ? 'cs2ps-tab-active' : ''}" type="button" data-tab="${tab.id}">${tab.label}</button>`).join('')}</div>
+			${overviewPanel}${matchesPanel}${faceitPanel}${steamPanel}
 		</div>
 	`;
 };
@@ -361,62 +417,51 @@ const renderCard = (root: HTMLElement, state: ViewState, steamId: string) => {
 	const providersFinished = state.leetify.status !== 'loading' && state.faceit.status !== 'loading';
 	const faceitFound = state.faceit.status === 'ok' || Boolean(faceit?.level) || Boolean(leetify?.ranks.faceit);
 	const hasScopeDamageTime = hasValue(leetify?.stats.damage_time_min_ms) && hasValue(leetify?.stats.damage_time_max_ms);
-	const reactionLabel = hasScopeDamageTime ? 'AWP reaction' : 'Reaction';
 	const reactionValue = hasScopeDamageTime
 		? formatSecondsRange(leetify?.stats.damage_time_min_ms, leetify?.stats.damage_time_max_ms)
 		: formatMilliseconds(leetify?.stats.reaction_time_ms);
 	const faceitStatus = faceitFound
-		? { modifier: 'cs2ps-faceit-found', text: 'FACEIT account found' }
+		? { modifier: 'cs2ps-faceit-found', text: faceit?.nickname ? `FACEIT · ${faceit.nickname}` : 'FACEIT account found' }
 		: !providersFinished
 			? { modifier: 'cs2ps-faceit-loading', text: 'Checking FACEIT account…' }
 			: state.faceit.status === 'not_found'
 				? { modifier: 'cs2ps-faceit-missing', text: 'No FACEIT account' }
 				: { modifier: 'cs2ps-faceit-unknown', text: 'FACEIT status unavailable' };
-	const emptyMessage =
-		state.leetify.status === 'not_found'
-			? 'Leetify has no public matches for this Steam account.'
-			: state.leetify.status === 'private'
-				? 'This player’s Leetify profile is private.'
-				: statusMessage('Leetify', state.leetify);
-	const performanceSummary = providersFinished && !hasPerformanceData
-		? `
-			<div class="cs2ps-empty-state">
-				<span class="cs2ps-empty-icon">${metricIcon('aim')}</span>
-				<span class="cs2ps-empty-copy">
-					<strong>No tracked CS2 performance data</strong>
-					<span>${escapeHtml(emptyMessage)}</span>
-					${state.steam.hours ? `<small>Steam playtime: ${escapeHtml(state.steam.hours)} h</small>` : ''}
-				</span>
-			</div>
-		`
-		: `
-			<div class="cs2ps-rank-row">
-				${rankPill('premier', 'Premier', formatInteger(leetify?.ranks.premier), 'cs2ps-rank-premier')}
-				${rankPill('rating', 'Leetify', formatLeetifyRating(leetify?.ranks.leetify), 'cs2ps-rank-leetify')}
-			</div>
-			<div class="cs2ps-summary-grid">
-				${metric('aim', 'Aim', formatMetric(leetify?.rating.aim), 'cs2ps-accent-aim')}
-				${metric('reaction', reactionLabel, reactionValue, 'cs2ps-accent-reaction')}
-				${metric('winrate', 'Winrate', formatWinrate(leetify?.winrate), 'cs2ps-accent-winrate')}
-			</div>
-			<div class="cs2ps-form-row">
-				<span class="cs2ps-form-label">FORM</span>
-				<div class="cs2ps-form">${renderForm(leetify?.recent_matches)}</div>
-			</div>
-		`;
+	const emptyMessage = state.leetify.status === 'not_found'
+		? 'Leetify has no public matches for this Steam account.'
+		: state.leetify.status === 'private'
+			? 'This player’s Leetify profile is private.'
+			: statusMessage('Leetify', { ...state.leetify, message: undefined });
+	const subtitle = hasPerformanceData && leetify?.total_matches !== undefined
+		? `${formatInteger(leetify.total_matches)} tracked matches`
+		: state.leetify.status === 'loading'
+			? 'Loading public stats…'
+			: hasPerformanceData
+				? 'Public performance summary'
+				: 'Public profile overview';
+	const performanceSummary = state.leetify.status === 'loading'
+		? '<div class="cs2ps-loading-summary"><span class="cs2ps-spinner"></span><span>Loading CS2 performance…</span></div>'
+		: !hasPerformanceData || !leetify
+			? `<div class="cs2ps-empty-state"><span class="cs2ps-empty-icon">${metricIcon('aim')}</span><span class="cs2ps-empty-copy"><strong>No tracked CS2 performance data</strong><span>${escapeHtml(emptyMessage)}</span>${state.steam.hours ? `<small>Steam playtime: ${escapeHtml(state.steam.hours)} h</small>` : ''}</span></div>`
+			: `
+				${renderRating(leetify)}
+				<div class="cs2ps-summary-grid">
+					${compactMetric('aim', 'Aim', formatMetric(leetify.rating.aim))}
+					${compactMetric('reaction', hasScopeDamageTime ? 'AWP damage' : 'Reaction', reactionValue)}
+					${compactMetric('winrate', 'Win rate', formatWinrate(leetify.winrate))}
+				</div>
+				<div class="cs2ps-form-row"><span class="cs2ps-form-label">Last matches</span><div class="cs2ps-form">${renderForm(leetify.recent_matches)}</div></div>
+			`;
 
 	root.innerHTML = `
 		<div class="cs2ps-card ${state.expanded ? 'cs2ps-is-expanded' : ''}">
 			<button class="cs2ps-header" type="button" aria-expanded="${state.expanded}">
-				<span class="cs2ps-title"><span class="cs2ps-title-mark">${metricIcon('aim')}</span><span>CS2 PERFORMANCE</span></span>
-				<span class="cs2ps-header-meta">${isLoading ? '<span class="cs2ps-spinner"></span>' : ''}<span>${state.expanded ? 'Hide' : 'Details'}</span><span class="cs2ps-chevron">⌄</span></span>
+				<span class="cs2ps-title-mark">${metricIcon('aim')}</span>
+				<span class="cs2ps-title-copy"><strong>CS2 stats</strong><small>${escapeHtml(subtitle)}</small></span>
+				<span class="cs2ps-header-meta">${isLoading ? '<span class="cs2ps-spinner"></span>' : ''}<span>${state.expanded ? 'Hide' : 'Details'}</span><span class="cs2ps-chevron">⌃</span></span>
 			</button>
 			${performanceSummary}
-			<div class="cs2ps-faceit-status ${faceitStatus.modifier}">
-				<span class="cs2ps-faceit-mark">F</span>
-				<span>${faceitStatus.text}</span>
-				${faceitFound ? '<span class="cs2ps-faceit-check">✓</span>' : ''}
-			</div>
+			<div class="cs2ps-faceit-status ${faceitStatus.modifier}"><span class="cs2ps-faceit-mark">F</span><span>${escapeHtml(faceitStatus.text)}</span>${faceitFound ? '<span class="cs2ps-faceit-check">✓</span>' : ''}</div>
 			${renderDetails(state, steamId)}
 		</div>
 	`;
@@ -424,6 +469,12 @@ const renderCard = (root: HTMLElement, state: ViewState, steamId: string) => {
 	root.querySelector<HTMLButtonElement>('.cs2ps-header')?.addEventListener('click', () => {
 		state.expanded = !state.expanded;
 		renderCard(root, state, steamId);
+	});
+	root.querySelectorAll<HTMLButtonElement>('.cs2ps-tab').forEach((tab) => {
+		tab.addEventListener('click', () => {
+			state.activeTab = tab.dataset.tab as DetailTab;
+			renderCard(root, state, steamId);
+		});
 	});
 };
 
@@ -485,6 +536,7 @@ export default async function WebkitMain() {
 		steam: { status: 'loading', steamId: '' },
 		preferences: { show_steam_details: true, expand_details: false },
 		expanded: false,
+		activeTab: 'overview',
 	};
 
 	renderCard(root, state, '');
