@@ -311,6 +311,7 @@ function get_faceit_profile(steamId)
             player_id = optional(player.player_id),
             level = optional(cs2.skill_level),
             elo = optional(cs2.faceit_elo),
+            region = optional(cs2.region),
             stats = {
                 matches = optional(lifetime.matches) or first_lifetime_value(lifetime, { "Matches", "matches" }),
                 kd = optional(lifetime.kd) or first_lifetime_value(lifetime, { "Average K/D Ratio", "K/D Ratio", "K/D", "kd" }),

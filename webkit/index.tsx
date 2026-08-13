@@ -61,6 +61,7 @@ type FaceitProfile = {
 	player_id?: string;
 	level?: number;
 	elo?: number;
+	region?: string;
 	stats: {
 		matches?: string;
 		kd?: string;
@@ -203,6 +204,8 @@ const detailedMetric = (label: string, value: string) => `
 	</div>
 `;
 
+const hasValue = (value: unknown) => value !== undefined && value !== null && String(value).trim() !== '';
+
 const renderForm = (matches: LeetifyProfile['recent_matches'] | undefined) => {
 	if (!matches?.length) return '<span class="cs2ps-form-empty">No recent matches</span>';
 
@@ -231,7 +234,9 @@ const renderDetails = (state: ViewState, steamId: string) => {
 	const faceit = state.faceit.data;
 	const leetifyUrl = `https://leetify.com/app/profile/${encodeURIComponent(steamId)}`;
 	const faceitUrl = faceit?.nickname ? `https://www.faceit.com/en/players/${encodeURIComponent(faceit.nickname)}` : undefined;
-	const finderUrl = `https://faceit-finder.com/id/${encodeURIComponent(steamId)}?lang=en`;
+	const hasFaceitLifetime = Boolean(
+		faceit && [faceit.stats.kd, faceit.stats.adr, faceit.stats.headshots, faceit.stats.winrate, faceit.stats.matches].some(hasValue),
+	);
 
 	const leetifySection =
 		state.leetify.status === 'ok' && leetify
@@ -264,14 +269,14 @@ const renderDetails = (state: ViewState, steamId: string) => {
 					<div class="cs2ps-detail-grid">
 						${detailedMetric('Level', formatInteger(faceit.level))}
 						${detailedMetric('ELO', formatInteger(faceit.elo))}
-						${detailedMetric('K/D', faceit.stats.kd || '—')}
-						${detailedMetric('ADR', faceit.stats.adr || '—')}
-						${detailedMetric('HS', faceit.stats.headshots || '—')}
-						${detailedMetric('Winrate', faceit.stats.winrate || '—')}
-						${detailedMetric('Matches', faceit.stats.matches || '—')}
+						${detailedMetric('Region', (faceit.region || faceit.country || '—').toUpperCase())}
+						${hasValue(faceit.stats.kd) ? detailedMetric('K/D', faceit.stats.kd!) : ''}
+						${hasValue(faceit.stats.adr) ? detailedMetric('ADR', faceit.stats.adr!) : ''}
+						${hasValue(faceit.stats.headshots) ? detailedMetric('HS', faceit.stats.headshots!) : ''}
+						${hasValue(faceit.stats.winrate) ? detailedMetric('Winrate', faceit.stats.winrate!) : ''}
+						${hasValue(faceit.stats.matches) ? detailedMetric('Matches', faceit.stats.matches!) : ''}
 					</div>
-					${state.faceit.message ? `<p class="cs2ps-detail-note">${escapeHtml(state.faceit.message)}</p>` : ''}
-					<a class="cs2ps-source-link" href="${finderUrl}" target="_blank" rel="noopener">FACEIT lookup via Faceit Finder ↗</a>
+					${!hasFaceitLifetime ? '<p class="cs2ps-detail-note">Lifetime statistics are unavailable from the public provider.</p>' : state.faceit.message ? `<p class="cs2ps-detail-note">${escapeHtml(state.faceit.message)}</p>` : ''}
 				</section>
 			`
 			: providerState('FACEIT', state.faceit);
