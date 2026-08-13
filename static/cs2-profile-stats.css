@@ -104,6 +104,66 @@
 	background: rgba(8, 16, 24, 0.97);
 }
 
+.cs2ps-empty-state {
+	display: flex;
+	align-items: flex-start;
+	gap: 10px;
+	padding: 13px 12px 12px;
+	background: rgba(8, 16, 24, 0.97);
+}
+
+.cs2ps-empty-icon {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	flex: 0 0 auto;
+	width: 29px;
+	height: 29px;
+	color: #718697;
+	background: rgba(113, 134, 151, 0.08);
+	border: 1px solid rgba(113, 134, 151, 0.13);
+	border-radius: 50%;
+}
+
+.cs2ps-empty-icon svg {
+	width: 16px;
+	height: 16px;
+	fill: none;
+	stroke: currentColor;
+	stroke-linecap: round;
+	stroke-linejoin: round;
+	stroke-width: 1.7;
+}
+
+.cs2ps-empty-copy {
+	display: block;
+	min-width: 0;
+}
+
+.cs2ps-empty-copy strong,
+.cs2ps-empty-copy span,
+.cs2ps-empty-copy small {
+	display: block;
+}
+
+.cs2ps-empty-copy strong {
+	margin: 1px 0 3px;
+	font-size: 11px;
+	color: #c4d0d9;
+}
+
+.cs2ps-empty-copy span,
+.cs2ps-empty-copy small {
+	font-size: 10px;
+	line-height: 14px;
+	color: #748897;
+}
+
+.cs2ps-empty-copy small {
+	margin-top: 3px;
+	color: #90a2af;
+}
+
 .cs2ps-rank-pill {
 	box-sizing: border-box;
 	min-width: 0;
@@ -372,6 +432,35 @@
 	display: grid;
 	grid-template-columns: repeat(3, minmax(0, 1fr));
 	gap: 6px;
+}
+
+.cs2ps-detail-list {
+	border-top: 1px solid rgba(255, 255, 255, 0.045);
+}
+
+.cs2ps-detail-row {
+	display: flex;
+	align-items: baseline;
+	justify-content: space-between;
+	gap: 12px;
+	min-width: 0;
+	padding: 7px 1px;
+	border-bottom: 1px solid rgba(255, 255, 255, 0.045);
+}
+
+.cs2ps-detail-row span {
+	flex: 0 0 auto;
+	font-size: 10px;
+	color: #657888;
+}
+
+.cs2ps-detail-row strong {
+	min-width: 0;
+	font-size: 11px;
+	font-weight: 600;
+	color: #d9e2e9;
+	text-align: right;
+	overflow-wrap: anywhere;
 }
 
 .cs2ps-detail-metric {

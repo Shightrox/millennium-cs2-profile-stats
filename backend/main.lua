@@ -3,7 +3,7 @@ local http = require("http")
 local logger = require("logger")
 local millennium = require("millennium")
 
-local PLUGIN_VERSION = "0.2.0"
+local PLUGIN_VERSION = "0.2.1"
 local USER_AGENT = "millennium-cs2-profile-stats/" .. PLUGIN_VERSION
 
 local function encode(payload)

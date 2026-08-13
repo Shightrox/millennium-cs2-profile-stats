@@ -98,6 +98,9 @@ const getLeetifyProfile = callable<[{ steamId: string }], string>('get_leetify_p
 const getFaceitProfile = callable<[{ steamId: string }], string>('get_faceit_profile');
 const getPreferences = callable<[], string>('get_preferences');
 
+const PROVIDER_TIMEOUT_MS = 15_000;
+const STEAM_TIMEOUT_MS = 8_000;
+
 const isProfilePage = () =>
 	window.location.hostname === 'steamcommunity.com' && /^\/(id|profiles)\/[^/]+\/?$/i.test(window.location.pathname);
 
@@ -111,6 +114,31 @@ const profileBaseUrl = () => {
 function parseJson<T>(raw: string): T {
 	return JSON.parse(raw) as T;
 }
+
+const withTimeout = <T,>(promise: Promise<T>, timeoutMs: number, message: string): Promise<T> =>
+	new Promise((resolve, reject) => {
+		const timeoutId = window.setTimeout(() => reject(new Error(message)), timeoutMs);
+		promise.then(
+			(value) => {
+				window.clearTimeout(timeoutId);
+				resolve(value);
+			},
+			(error) => {
+				window.clearTimeout(timeoutId);
+				reject(error);
+			},
+		);
+	});
+
+const fetchWithTimeout = async (input: RequestInfo | URL, init: RequestInit = {}, timeoutMs = STEAM_TIMEOUT_MS) => {
+	const controller = new AbortController();
+	const timeoutId = window.setTimeout(() => controller.abort(), timeoutMs);
+	try {
+		return await fetch(input, { ...init, signal: controller.signal });
+	} finally {
+		window.clearTimeout(timeoutId);
+	}
+};
 
 const escapeHtml = (value: unknown) =>
 	String(value ?? '')
@@ -204,6 +232,13 @@ const detailedMetric = (label: string, value: string) => `
 	</div>
 `;
 
+const detailedRow = (label: string, value: string) => `
+	<div class="cs2ps-detail-row">
+		<span>${escapeHtml(label)}</span>
+		<strong>${escapeHtml(value)}</strong>
+	</div>
+`;
+
 const hasValue = (value: unknown) => value !== undefined && value !== null && String(value).trim() !== '';
 
 const renderForm = (matches: LeetifyProfile['recent_matches'] | undefined) => {
@@ -285,10 +320,10 @@ const renderDetails = (state: ViewState, steamId: string) => {
 		? `
 			<section class="cs2ps-detail-section">
 				<div class="cs2ps-detail-heading"><span>Steam</span></div>
-				<div class="cs2ps-detail-grid">
-					${detailedMetric('CS2 hours', state.steam.hours || 'Private')}
-					${detailedMetric('Last 2 weeks', state.steam.recentHours || (state.steam.status === 'loading' ? 'Loading…' : 'Private'))}
-					${detailedMetric('Member since', state.steam.memberSince || (state.steam.status === 'loading' ? 'Loading…' : 'Unknown'))}
+				<div class="cs2ps-detail-list">
+					${detailedRow('CS2 hours', state.steam.hours || 'Private')}
+					${detailedRow('Last 2 weeks', state.steam.recentHours || (state.steam.status === 'loading' ? 'Loading…' : 'Private'))}
+					${detailedRow('Member since', state.steam.memberSince || (state.steam.status === 'loading' ? 'Loading…' : 'Unknown'))}
 				</div>
 			</section>
 		`
@@ -310,15 +345,48 @@ const renderCard = (root: HTMLElement, state: ViewState, steamId: string) => {
 	const leetify = state.leetify.data;
 	const faceit = state.faceit.data;
 	const isLoading = state.leetify.status === 'loading' || state.faceit.status === 'loading';
+	const hasPerformanceData = state.leetify.status === 'ok' && Boolean(leetify);
+	const providersFinished = state.leetify.status !== 'loading' && state.faceit.status !== 'loading';
 	const faceitFound = state.faceit.status === 'ok' || Boolean(faceit?.level) || Boolean(leetify?.ranks.faceit);
-	const faceitFinished = state.faceit.status !== 'loading' && state.leetify.status !== 'loading';
 	const faceitStatus = faceitFound
 		? { modifier: 'cs2ps-faceit-found', text: 'FACEIT account found' }
-		: !faceitFinished
+		: !providersFinished
 			? { modifier: 'cs2ps-faceit-loading', text: 'Checking FACEIT account…' }
 			: state.faceit.status === 'not_found'
 				? { modifier: 'cs2ps-faceit-missing', text: 'No FACEIT account' }
 				: { modifier: 'cs2ps-faceit-unknown', text: 'FACEIT status unavailable' };
+	const emptyMessage =
+		state.leetify.status === 'not_found'
+			? 'Leetify has no public matches for this Steam account.'
+			: state.leetify.status === 'private'
+				? 'This player’s Leetify profile is private.'
+				: statusMessage('Leetify', state.leetify);
+	const performanceSummary = providersFinished && !hasPerformanceData
+		? `
+			<div class="cs2ps-empty-state">
+				<span class="cs2ps-empty-icon">${metricIcon('aim')}</span>
+				<span class="cs2ps-empty-copy">
+					<strong>No tracked CS2 performance data</strong>
+					<span>${escapeHtml(emptyMessage)}</span>
+					${state.steam.hours ? `<small>Steam playtime: ${escapeHtml(state.steam.hours)} h</small>` : ''}
+				</span>
+			</div>
+		`
+		: `
+			<div class="cs2ps-rank-row">
+				${rankPill('premier', 'Premier', formatInteger(leetify?.ranks.premier), 'cs2ps-rank-premier')}
+				${rankPill('rating', 'Leetify', formatLeetifyRating(leetify?.ranks.leetify), 'cs2ps-rank-leetify')}
+			</div>
+			<div class="cs2ps-summary-grid">
+				${metric('aim', 'Aim', formatMetric(leetify?.rating.aim), 'cs2ps-accent-aim')}
+				${metric('reaction', 'Reaction', formatMilliseconds(leetify?.stats.reaction_time_ms), 'cs2ps-accent-reaction')}
+				${metric('winrate', 'Winrate', formatWinrate(leetify?.winrate), 'cs2ps-accent-winrate')}
+			</div>
+			<div class="cs2ps-form-row">
+				<span class="cs2ps-form-label">FORM</span>
+				<div class="cs2ps-form">${renderForm(leetify?.recent_matches)}</div>
+			</div>
+		`;
 
 	root.innerHTML = `
 		<div class="cs2ps-card ${state.expanded ? 'cs2ps-is-expanded' : ''}">
@@ -326,19 +394,7 @@ const renderCard = (root: HTMLElement, state: ViewState, steamId: string) => {
 				<span class="cs2ps-title"><span class="cs2ps-title-mark">${metricIcon('aim')}</span><span>CS2 PERFORMANCE</span></span>
 				<span class="cs2ps-header-meta">${isLoading ? '<span class="cs2ps-spinner"></span>' : ''}<span>${state.expanded ? 'Hide' : 'Details'}</span><span class="cs2ps-chevron">⌄</span></span>
 			</button>
-			<div class="cs2ps-rank-row">
-				${rankPill('premier', 'Premier', formatInteger(leetify?.ranks.premier), 'cs2ps-rank-premier')}
-				${rankPill('rating', 'Leetify', formatLeetifyRating(leetify?.ranks.leetify), 'cs2ps-rank-leetify')}
-			</div>
-			<div class="cs2ps-summary-grid">
-				${metric('aim', 'Aim', formatMetric(leetify?.rating.aim), 'cs2ps-accent-aim')}
-				${metric('reaction', 'Time to DMG', formatMilliseconds(leetify?.stats.reaction_time_ms), 'cs2ps-accent-reaction')}
-				${metric('winrate', 'Winrate', formatWinrate(leetify?.winrate), 'cs2ps-accent-winrate')}
-			</div>
-			<div class="cs2ps-form-row">
-				<span class="cs2ps-form-label">FORM</span>
-				<div class="cs2ps-form">${renderForm(leetify?.recent_matches)}</div>
-			</div>
+			${performanceSummary}
 			<div class="cs2ps-faceit-status ${faceitStatus.modifier}">
 				<span class="cs2ps-faceit-mark">F</span>
 				<span>${faceitStatus.text}</span>
@@ -357,32 +413,31 @@ const renderCard = (root: HTMLElement, state: ViewState, steamId: string) => {
 const fetchSteamProfile = async (): Promise<SteamProfile> => {
 	const baseUrl = profileBaseUrl();
 	const parser = new DOMParser();
-	const profileResponse = await fetch(`${baseUrl}?xml=1`, { credentials: 'same-origin' });
+	const profileResponse = await fetchWithTimeout(`${baseUrl}?xml=1`, { credentials: 'same-origin' });
 	if (!profileResponse.ok) throw new Error(`Steam profile returned HTTP ${profileResponse.status}.`);
 
 	const profileXml = parser.parseFromString(await profileResponse.text(), 'application/xml');
 	const steamId = profileXml.querySelector('steamID64')?.textContent || document.querySelector<HTMLInputElement>('input[name="abuseID"]')?.value || '';
 	if (!/^\d{17}$/.test(steamId)) throw new Error('Could not determine SteamID64.');
 
-	const result: SteamProfile = {
+	return {
 		status: 'ok',
 		steamId,
 		memberSince: profileXml.querySelector('memberSince')?.textContent || undefined,
 	};
+};
 
-	try {
-		const gamesResponse = await fetch(`${baseUrl}/games?tab=all&xml=1`, { credentials: 'same-origin' });
-		if (gamesResponse.ok) {
-			const gamesXml = parser.parseFromString(await gamesResponse.text(), 'application/xml');
-			const cs2 = Array.from(gamesXml.querySelectorAll('game')).find((game) => game.querySelector('appID')?.textContent === '730');
-			result.hours = cs2?.querySelector('hoursOnRecord')?.textContent || undefined;
-			result.recentHours = cs2?.querySelector('hoursLast2Weeks')?.textContent || undefined;
-		}
-	} catch (error) {
-		console.warn('[CS2 Profile Stats] Steam games are unavailable:', error);
-	}
+const fetchSteamPlaytime = async (): Promise<Pick<SteamProfile, 'hours' | 'recentHours'>> => {
+	const parser = new DOMParser();
+	const gamesResponse = await fetchWithTimeout(`${profileBaseUrl()}/games?tab=all&xml=1`, { credentials: 'same-origin' }, 6_000);
+	if (!gamesResponse.ok) return {};
 
-	return result;
+	const gamesXml = parser.parseFromString(await gamesResponse.text(), 'application/xml');
+	const cs2 = Array.from(gamesXml.querySelectorAll('game')).find((game) => game.querySelector('appID')?.textContent === '730');
+	return {
+		hours: cs2?.querySelector('hoursOnRecord')?.textContent || undefined,
+		recentHours: cs2?.querySelector('hoursLast2Weeks')?.textContent || undefined,
+	};
 };
 
 const injectStyles = () => {
@@ -441,7 +496,16 @@ export default async function WebkitMain() {
 
 	renderCard(root, state, steamId);
 
-	void getLeetifyProfile({ steamId })
+	void fetchSteamPlaytime()
+		.then((playtime) => {
+			state.steam = { ...state.steam, ...playtime };
+		})
+		.catch((error) => {
+			console.warn('[CS2 Profile Stats] Steam games are unavailable:', error);
+		})
+		.finally(() => renderCard(root, state, steamId));
+
+	void withTimeout(getLeetifyProfile({ steamId }), PROVIDER_TIMEOUT_MS, 'Leetify request timed out.')
 		.then((raw) => {
 			state.leetify = parseJson<ProviderResponse<LeetifyProfile>>(raw);
 		})
@@ -450,7 +514,7 @@ export default async function WebkitMain() {
 		})
 		.finally(() => renderCard(root, state, steamId));
 
-	void getFaceitProfile({ steamId })
+	void withTimeout(getFaceitProfile({ steamId }), PROVIDER_TIMEOUT_MS, 'FACEIT request timed out.')
 		.then((raw) => {
 			state.faceit = parseJson<ProviderResponse<FaceitProfile>>(raw);
 		})
