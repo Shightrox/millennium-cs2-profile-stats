@@ -1,59 +1,54 @@
-# CS2 Profile Stats for Millennium
+<div align="center">
+  <img src="assets/banner.svg" alt="CS2 Profile Stats for Millennium" width="100%">
+</div>
 
-A compact CS2 statistics card embedded directly into Steam Community profile pages. It combines the most useful public Leetify, FACEIT, and Steam metrics without sending the user to a separate stats site.
+<div align="center">
 
-> Early development version. Steam's profile markup and third-party data sources can change, so expect rough edges while the first release is being tested.
+[![CI](https://github.com/Shightrox/millennium-cs2-profile-stats/actions/workflows/ci.yml/badge.svg)](https://github.com/Shightrox/millennium-cs2-profile-stats/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/Shightrox/millennium-cs2-profile-stats?include_prereleases&color=66c0f4)](https://github.com/Shightrox/millennium-cs2-profile-stats/releases)
+[![Millennium](https://img.shields.io/badge/Millennium-3.x-1b2838?logo=steam&logoColor=white)](https://steambrew.app/)
+[![License](https://img.shields.io/github/license/Shightrox/millennium-cs2-profile-stats?color=7cc17e)](LICENSE)
 
-## Current features
+Useful CS2 statistics, embedded directly into Steam Community profiles.
 
-- Current Premier rating
-- FACEIT level and ELO
-- Leetify Rating, recent K/D, Aim, Positioning, and Utility
-- Leetify winrate, match count, and recent match history with map, date, and score
-- FACEIT lifetime K/D, ADR, HS%, winrate, and match count
-- Public Steam CS2 hours, recent hours, and account creation date
-- On-demand USD estimate for public CS2 inventories using lowest Steam Market prices
-- Compact summary plus separate Overview, Matches, FACEIT, and Steam detail tabs
-- Independent provider loading: one unavailable source does not hide the others
-- Works without mandatory API keys
+</div>
 
-The card is inserted into the right-hand column of Steam profiles, below the current online/offline status.
+## Preview
 
-## Data sources
+|                                                 Premier + FACEIT                                                  |                                              No Premier rating                                               |
+| :---------------------------------------------------------------------------------------------------------------: | :----------------------------------------------------------------------------------------------------------: |
+| <img src="assets/screenshots/equagin-compact.png" alt="Compact card with Premier and FACEIT ratings" width="357"> | <img src="assets/screenshots/phobia-no-premier.png" alt="Compact card without a Premier rating" width="357"> |
 
-- [Leetify Public CS API](https://api-public-docs.cs-prod.leetify.com/) for Leetify and Premier metrics. A Leetify developer key is optional and only improves rate limits. If that API does not index an otherwise public legacy profile, the plugin falls back to the keyless profile endpoint used by Leetify's web client.
-- [SCOPE.GG](https://scope.gg/) public player pages for an AWP time-to-damage range when that metric is absent from a legacy Leetify profile.
-- [Faceit Finder](https://faceit-finder.com/) for zero-configuration Steam-to-FACEIT lookup and public FACEIT statistics.
-- Steam Community's public profile XML for SteamID64, account age, and public playtime.
-- Steam Community's public inventory endpoint and Market price overview for the optional inventory estimate. Only marketable items with an available price are included; stickers and other item-specific premiums are not appraised.
+The card sits below the profile's online status and adapts to the data available for that player. Open **Details** for recent matches, extended Leetify and FACEIT metrics, Steam activity, and an optional inventory estimate.
 
-Leetify may expose fewer detailed metrics for unregistered players; the summary ratings and recent matches remain available when Leetify has tracked them. Private Steam game details prevent playtime from being displayed, and private inventories cannot be valued.
+## Features
 
-FACEIT integration is isolated behind its own provider because the zero-configuration lookup is not an official, versioned FACEIT API. If that source changes, Leetify and Steam data continue to work.
+- Premier rating with native CS2 rank colors
+- FACEIT level, ELO, lifetime stats, and level colors
+- Leetify rating, recent K/D, Aim, Positioning, Utility, and Opening
+- Reaction time or SCOPE.GG AWP time-to-damage when available
+- Win rate, tracked match count, and recent match results
+- Recent match history with map, date, source, and score
+- Steam CS2 hours, recent playtime, and account creation date
+- On-demand estimate for public CS2 inventories using Steam Market prices
+- Compact summary plus Overview, Matches, FACEIT, and Steam detail tabs
+- Independent provider loading, so one unavailable source does not hide the rest
+- No mandatory API keys, telemetry, or persistent player-stat storage
 
-Leetify data is displayed according to the [Leetify API Developer Guidelines](https://leetify.com/blog/leetify-api-developer-guidelines/). The plugin does not persist player statistics.
+## Installation
 
-## Requirements
+### Release archive
 
-- [Millennium](https://steambrew.app/) 3.x
-- Steam desktop client
+1. Download the latest `cs2-profile-stats-v*.zip` from [Releases](https://github.com/Shightrox/millennium-cs2-profile-stats/releases).
+2. Extract the `cs2-profile-stats` folder into `<Steam>/millennium/plugins/`.
+3. Restart Steam.
+4. Open **Steam → Millennium → Plugins**, enable **CS2 Profile Stats**, and save the changes.
 
-For development:
+An installation through the SteamBrew plugin directory is planned after review.
 
-- Node.js
-- pnpm
+### Development checkout
 
-## Development
-
-```powershell
-pnpm install
-pnpm typecheck
-pnpm build
-```
-
-Build artifacts are generated in `.millennium/Dist`.
-
-For local testing, place the repository in Millennium's plugin directory or create a directory junction/symbolic link:
+Clone the repository and create a directory junction or symbolic link from Millennium's plugin folder to the checkout:
 
 ```powershell
 New-Item -ItemType Junction `
@@ -61,14 +56,58 @@ New-Item -ItemType Junction `
   -Target '<repository path>'
 ```
 
-Restart Steam, enable **CS2 Profile Stats** under **Millennium → Plugins**, save the changes, and restart Steam once more. Backend changes require a full Steam restart.
+Then install dependencies, build, and restart Steam:
 
-## Project structure
+```powershell
+pnpm install
+pnpm typecheck
+pnpm build
+```
 
-- `backend/main.lua` — HTTP providers, configuration, and normalized IPC responses
+Backend changes require a full Steam restart.
+
+## Data sources
+
+- [Leetify Public CS API](https://api-public-docs.cs-prod.leetify.com/) for Leetify and Premier metrics. A developer key is optional and only improves rate limits. The plugin can fall back to the keyless profile endpoint used by Leetify's web client for public legacy profiles.
+- [SCOPE.GG](https://scope.gg/) public player pages for an AWP time-to-damage range when that metric is available.
+- [Faceit Finder](https://faceit-finder.com/) for zero-configuration Steam-to-FACEIT lookup and public FACEIT statistics.
+- Steam Community public profile, inventory, and Market endpoints for Steam activity and the optional inventory estimate.
+
+Third-party services may return incomplete data or change without notice. Private Steam game details hide playtime; private inventories cannot be valued. Inventory values are approximate and do not include sticker, float, pattern, or other item-specific premiums.
+
+FACEIT lookup is isolated behind its own provider because the zero-configuration source is not an official versioned FACEIT API. If it changes, Leetify and Steam data continue to work.
+
+Leetify data is displayed according to the [Leetify API Developer Guidelines](https://leetify.com/blog/leetify-api-developer-guidelines/).
+
+## Settings
+
+- Optional Leetify API key for higher rate limits
+- Show or hide the Steam activity tab
+- Expand details by default
+
+## Development
+
+```powershell
+pnpm install --frozen-lockfile
+pnpm typecheck
+pnpm build
+pnpm dlx luaparse backend/main.lua
+```
+
+Build artifacts are generated in `.millennium/Dist`. To create an installable archive:
+
+```powershell
+./scripts/package.ps1
+```
+
+Project structure:
+
+- `backend/main.lua` — HTTP providers, normalization, configuration, and IPC responses
 - `webkit/index.tsx` — Steam profile detection and card rendering
 - `frontend/index.tsx` — Millennium plugin settings
-- `static/` — scoped stylesheet and required attribution assets
+- `static/` — scoped styles and attribution assets
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) before submitting a change and [CHANGELOG.md](CHANGELOG.md) for release history.
 
 ## Privacy
 
@@ -76,4 +115,6 @@ The plugin reads the public SteamID64 of the profile being viewed and requests p
 
 ## License
 
-[MIT](LICENSE)
+Released under the [MIT License](LICENSE).
+
+This project is not affiliated with Valve, Steam, Counter-Strike, Leetify, FACEIT, SCOPE.GG, or Faceit Finder. All product names and trademarks belong to their respective owners.

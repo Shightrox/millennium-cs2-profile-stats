@@ -4,7 +4,7 @@ local logger = require("logger")
 local millennium = require("millennium")
 local utils = require("utils")
 
-local PLUGIN_VERSION = "0.4.2"
+local PLUGIN_VERSION = "0.4.3"
 local USER_AGENT = "millennium-cs2-profile-stats/" .. PLUGIN_VERSION
 
 local function encode(payload)
@@ -114,7 +114,12 @@ local function error_status(http_status)
 end
 
 local function provider_error(provider, http_status, message)
-    logger:warn(provider .. " request failed (" .. tostring(http_status) .. "): " .. tostring(message))
+    local log_message = provider .. " request failed (" .. tostring(http_status) .. "): " .. tostring(message)
+    if http_status == 404 then
+        logger:info(log_message)
+    else
+        logger:warn(log_message)
+    end
     return encode({
         status = error_status(http_status),
         message = message or "Provider request failed.",
@@ -265,7 +270,7 @@ local function get_public_recent_kd(steam_id, headers)
     local url = "https://api-public.cs-prod.leetify.com/v3/profile/matches?steam64_id=" .. steam_id
     local matches, status, request_error = request_json(url, headers, 4)
     if matches == nil then
-        logger:warn("Leetify match history unavailable (" .. tostring(status) .. "): " .. tostring(request_error))
+        logger:info("Optional Leetify match history unavailable (" .. tostring(status) .. "): " .. tostring(request_error))
         return nil, nil
     end
 
@@ -359,7 +364,7 @@ local function get_scope_damage_time(steam_id)
     })
 
     if response == nil or response.status < 200 or response.status >= 300 then
-        logger:warn("SCOPE.GG enrichment unavailable (" .. tostring(response and response.status or 0) .. "): " .. tostring(request_error))
+        logger:info("Optional SCOPE.GG enrichment unavailable (" .. tostring(response and response.status or 0) .. "): " .. tostring(request_error))
         return nil, nil, nil
     end
 
@@ -630,7 +635,7 @@ function get_faceit_profile(steamId)
     if next(lifetime) == nil then
         partial_message = "FACEIT profile loaded, but lifetime statistics are unavailable."
         local html_status = stats_response and stats_response.status or 0
-        logger:warn("FACEIT lifetime stats unavailable (API " .. tostring(stats_status) .. ", HTML " .. tostring(html_status) .. "): " .. tostring(stats_error or html_error))
+        logger:info("Optional FACEIT lifetime stats unavailable (API " .. tostring(stats_status) .. ", HTML " .. tostring(html_status) .. "): " .. tostring(stats_error or html_error))
     end
 
     return encode({

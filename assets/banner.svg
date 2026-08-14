@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="320" viewBox="0 0 1280 320" role="img" aria-labelledby="title description">
+  <title id="title">CS2 Profile Stats for Millennium</title>
+  <desc id="description">A dark blue banner with a crosshair emblem and example CS2 metrics.</desc>
+  <defs>
+    <linearGradient id="background" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0b141c"/>
+      <stop offset="0.55" stop-color="#122433"/>
+      <stop offset="1" stop-color="#081018"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0.2" cy="0.45" r="0.7">
+      <stop offset="0" stop-color="#66c0f4" stop-opacity="0.2"/>
+      <stop offset="1" stop-color="#66c0f4" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="accent" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#66c0f4"/>
+      <stop offset="1" stop-color="#8cd7ff"/>
+    </linearGradient>
+  </defs>
+  <rect width="1280" height="320" rx="24" fill="url(#background)"/>
+  <rect width="1280" height="320" rx="24" fill="url(#glow)"/>
+  <path d="M0 272 C210 218 330 340 550 272 S900 210 1280 282 V320 H0Z" fill="#66c0f4" opacity="0.04"/>
+  <g transform="translate(86 84)" fill="none" stroke="url(#accent)" stroke-linecap="round">
+    <circle cx="76" cy="76" r="58" stroke-width="3" opacity="0.42"/>
+    <circle cx="76" cy="76" r="22" stroke-width="4"/>
+    <path d="M76 0v40M76 112v40M0 76h40M112 76h40" stroke-width="5"/>
+    <circle cx="76" cy="76" r="5" fill="#8cd7ff" stroke="none"/>
+  </g>
+  <g font-family="Inter, Segoe UI, Arial, sans-serif">
+    <text x="276" y="130" fill="#f2f5f7" font-size="54" font-weight="700" letter-spacing="1">CS2 PROFILE STATS</text>
+    <text x="279" y="177" fill="#8fa7b8" font-size="23">Leetify, FACEIT and Steam metrics — right on the profile.</text>
+    <text x="279" y="224" fill="#66c0f4" font-size="18" font-weight="600" letter-spacing="2">FOR MILLENNIUM</text>
+  </g>
+  <g transform="translate(970 74)" font-family="Inter, Segoe UI, Arial, sans-serif">
+    <rect width="226" height="172" rx="14" fill="#0a1219" stroke="#66c0f4" stroke-opacity="0.22"/>
+    <text x="24" y="38" fill="#718a9b" font-size="12" font-weight="700" letter-spacing="1.4">PLAYER SNAPSHOT</text>
+    <text x="24" y="78" fill="#718a9b" font-size="11">PREMIER</text>
+    <text x="118" y="78" fill="#718a9b" font-size="11">FACEIT</text>
+    <text x="24" y="108" fill="#e584bf" font-size="25" font-weight="700">23 109</text>
+    <text x="118" y="108" fill="#ee666b" font-size="25" font-weight="700">LVL 10</text>
+    <path d="M24 126h178" stroke="#ffffff" stroke-opacity="0.08"/>
+    <text x="24" y="151" fill="#79c9ef" font-size="12" font-weight="700">AIM 90.7</text>
+    <text x="118" y="151" fill="#7cc17e" font-size="12" font-weight="700">WR 58.6%</text>
+  </g>
+</svg>

@@ -1,0 +1,41 @@
+name: Bug report
+description: Report incorrect data, a broken profile card, or a plugin error.
+title: '[Bug]: '
+labels: [bug]
+body:
+    - type: markdown
+      attributes:
+          value: Thanks for taking the time to report a problem. Do not include API keys or private credentials.
+    - type: input
+      id: profile
+      attributes:
+          label: Steam profile URL
+          placeholder: https://steamcommunity.com/id/example/
+      validations:
+          required: true
+    - type: input
+      id: versions
+      attributes:
+          label: Versions
+          description: Include your Millennium and CS2 Profile Stats versions.
+          placeholder: Millennium 3.x, CS2 Profile Stats 0.4.3
+      validations:
+          required: true
+    - type: textarea
+      id: problem
+      attributes:
+          label: What happened?
+          description: Describe the result and what you expected instead.
+      validations:
+          required: true
+    - type: textarea
+      id: logs
+      attributes:
+          label: Relevant logs
+          description: Copy only the relevant plugin logs and remove private information.
+          render: text
+    - type: textarea
+      id: screenshots
+      attributes:
+          label: Screenshots
+          description: Drag screenshots here if they help explain the problem.

@@ -1,0 +1,41 @@
+name: CI
+
+on:
+    push:
+        branches: [main]
+    pull_request:
+        branches: [main]
+
+permissions:
+    contents: read
+
+jobs:
+    validate:
+        runs-on: ubuntu-latest
+        steps:
+            - name: Check out repository
+              uses: actions/checkout@v4
+
+            - name: Set up pnpm
+              uses: pnpm/action-setup@v4
+
+            - name: Set up Node.js
+              uses: actions/setup-node@v4
+              with:
+                  node-version: 22
+                  cache: pnpm
+
+            - name: Install dependencies
+              run: pnpm install --frozen-lockfile
+
+            - name: Check manifest versions
+              run: node -e "const fs=require('fs');const p=JSON.parse(fs.readFileSync('package.json'));const m=JSON.parse(fs.readFileSync('plugin.json'));if(p.version!==m.version)throw new Error('package.json and plugin.json versions differ')"
+
+            - name: Type-check
+              run: pnpm typecheck
+
+            - name: Build
+              run: pnpm build
+
+            - name: Parse Lua backend
+              run: pnpm dlx luaparse backend/main.lua > /dev/null
