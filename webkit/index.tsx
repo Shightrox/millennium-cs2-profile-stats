@@ -261,8 +261,9 @@ const aimPresentation = (value: unknown) => {
 	if (aim < 45) return { modifier: 'cs2ps-aim-developing', marker: '😬', label: 'Developing aim rating' };
 	if (aim < 60) return { modifier: 'cs2ps-aim-average', marker: '😐', label: 'Average aim rating' };
 	if (aim < 75) return { modifier: 'cs2ps-aim-good', marker: '👍', label: 'Good aim rating' };
-	if (aim < 90) return { modifier: 'cs2ps-aim-great', marker: '🔥', label: 'Great aim rating' };
-	return { modifier: 'cs2ps-aim-elite', marker: '🎯', label: 'Elite aim rating' };
+	if (aim < 85) return { modifier: 'cs2ps-aim-great', marker: '🔥', label: 'Great aim rating' };
+	if (aim <= 92) return { modifier: 'cs2ps-aim-elite', marker: '🎯', label: 'Elite aim rating' };
+	return { modifier: 'cs2ps-aim-suspicious', marker: '💀', label: 'Unusually high aim rating' };
 };
 
 const premierTierClass = (value: number) => {
