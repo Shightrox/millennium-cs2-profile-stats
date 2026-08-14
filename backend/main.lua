@@ -4,7 +4,7 @@ local logger = require("logger")
 local millennium = require("millennium")
 local utils = require("utils")
 
-local PLUGIN_VERSION = "0.4.1"
+local PLUGIN_VERSION = "0.4.2"
 local USER_AGENT = "millennium-cs2-profile-stats/" .. PLUGIN_VERSION
 
 local function encode(payload)

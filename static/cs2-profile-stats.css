@@ -155,17 +155,18 @@
 
 .cs2ps-rating-meta {
 	display: flex;
+	flex-wrap: wrap;
 	align-items: center;
-	gap: 9px;
+	gap: 2px 6px;
 	margin-top: 5px;
 	color: #6f8493;
 	font-size: 8px;
-	white-space: nowrap;
+	line-height: 11px;
+	letter-spacing: 0.35px;
 }
 
-.cs2ps-rating-meta > span + span {
-	padding-left: 9px;
-	border-left: 1px solid rgba(255, 255, 255, 0.07);
+.cs2ps-rating-meta > span {
+	white-space: nowrap;
 }
 
 .cs2ps-rating-meta strong {
