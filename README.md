@@ -15,11 +15,24 @@ Useful CS2 statistics, embedded directly into Steam Community profiles.
 
 ## Preview
 
+### Premier + FACEIT
+
+<img src="assets/screenshots/equagin-profile.png" alt="CS2 Profile Stats embedded in a Steam profile with Premier and FACEIT ratings" width="100%">
+
+### No Premier rating
+
+<img src="assets/screenshots/phobia-profile.png" alt="CS2 Profile Stats embedded in a Steam profile without a Premier rating" width="100%">
+
+The card sits below the profile's online status and adapts to the data available for that player. Open **Details** for recent matches, extended Leetify and FACEIT metrics, Steam activity, and an optional inventory estimate.
+
+<details>
+<summary>Compact card close-ups</summary>
+
 |                                                 Premier + FACEIT                                                  |                                              No Premier rating                                               |
 | :---------------------------------------------------------------------------------------------------------------: | :----------------------------------------------------------------------------------------------------------: |
 | <img src="assets/screenshots/equagin-compact.png" alt="Compact card with Premier and FACEIT ratings" width="357"> | <img src="assets/screenshots/phobia-no-premier.png" alt="Compact card without a Premier rating" width="357"> |
 
-The card sits below the profile's online status and adapts to the data available for that player. Open **Details** for recent matches, extended Leetify and FACEIT metrics, Steam activity, and an optional inventory estimate.
+</details>
 
 ## Features
 
