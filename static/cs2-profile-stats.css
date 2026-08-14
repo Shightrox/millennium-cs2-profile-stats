@@ -153,12 +153,25 @@
 	letter-spacing: -0.6px;
 }
 
-.cs2ps-rating-copy > small,
-.cs2ps-secondary-rating > small {
-	display: block;
-	margin-top: 3px;
+.cs2ps-rating-meta {
+	display: flex;
+	align-items: center;
+	gap: 9px;
+	margin-top: 5px;
 	color: #6f8493;
-	font-size: 9px;
+	font-size: 8px;
+	white-space: nowrap;
+}
+
+.cs2ps-rating-meta > span + span {
+	padding-left: 9px;
+	border-left: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+.cs2ps-rating-meta strong {
+	color: #cbd5dc;
+	font-size: 10px;
+	font-weight: 600;
 }
 
 .cs2ps-rating-scale {
@@ -261,6 +274,41 @@
 	letter-spacing: 0.2px;
 }
 
+.cs2ps-premier-grey { background: linear-gradient(155deg, rgba(139, 150, 159, 0.22), rgba(72, 80, 87, 0.1)); }
+.cs2ps-premier-grey::after { border-color: rgba(166, 177, 186, 0.38); }
+.cs2ps-premier-grey > strong, .cs2ps-premier-grey .cs2ps-premier-icon { color: #bdc6cc; }
+.cs2ps-premier-grey > span:not(.cs2ps-premier-icon) { color: #8f9ba3; }
+
+.cs2ps-premier-cyan { background: linear-gradient(155deg, rgba(63, 178, 196, 0.24), rgba(31, 94, 106, 0.1)); }
+.cs2ps-premier-cyan::after { border-color: rgba(80, 204, 222, 0.42); }
+.cs2ps-premier-cyan > strong, .cs2ps-premier-cyan .cs2ps-premier-icon { color: #70d3df; }
+.cs2ps-premier-cyan > span:not(.cs2ps-premier-icon) { color: #579ba5; }
+
+.cs2ps-premier-blue { background: linear-gradient(155deg, rgba(66, 112, 211, 0.26), rgba(34, 59, 117, 0.1)); }
+.cs2ps-premier-blue::after { border-color: rgba(85, 133, 235, 0.43); }
+.cs2ps-premier-blue > strong, .cs2ps-premier-blue .cs2ps-premier-icon { color: #82a8f4; }
+.cs2ps-premier-blue > span:not(.cs2ps-premier-icon) { color: #6d84bd; }
+
+.cs2ps-premier-purple { background: linear-gradient(155deg, rgba(131, 79, 197, 0.28), rgba(70, 40, 107, 0.1)); }
+.cs2ps-premier-purple::after { border-color: rgba(161, 104, 229, 0.45); }
+.cs2ps-premier-purple > strong, .cs2ps-premier-purple .cs2ps-premier-icon { color: #b88aef; }
+.cs2ps-premier-purple > span:not(.cs2ps-premier-icon) { color: #9270b9; }
+
+.cs2ps-premier-pink { background: linear-gradient(155deg, rgba(198, 68, 146, 0.27), rgba(111, 35, 80, 0.1)); }
+.cs2ps-premier-pink::after { border-color: rgba(229, 86, 170, 0.44); }
+.cs2ps-premier-pink > strong, .cs2ps-premier-pink .cs2ps-premier-icon { color: #eb84be; }
+.cs2ps-premier-pink > span:not(.cs2ps-premier-icon) { color: #b66b94; }
+
+.cs2ps-premier-red { background: linear-gradient(155deg, rgba(198, 67, 71, 0.27), rgba(105, 34, 37, 0.1)); }
+.cs2ps-premier-red::after { border-color: rgba(229, 85, 90, 0.44); }
+.cs2ps-premier-red > strong, .cs2ps-premier-red .cs2ps-premier-icon { color: #ed8588; }
+.cs2ps-premier-red > span:not(.cs2ps-premier-icon) { color: #b66b6e; }
+
+.cs2ps-premier-gold { background: linear-gradient(155deg, rgba(185, 145, 55, 0.25), rgba(93, 74, 31, 0.1)); }
+.cs2ps-premier-gold::after { border-color: rgba(219, 185, 91, 0.44); }
+.cs2ps-premier-gold > strong, .cs2ps-premier-gold .cs2ps-premier-icon { color: #ead18b; }
+.cs2ps-premier-gold > span:not(.cs2ps-premier-icon) { color: #ad9453; }
+
 .cs2ps-secondary-rating {
 	padding-left: 18px;
 	border-left: 1px solid rgba(255, 255, 255, 0.065);
@@ -329,6 +377,23 @@
 	white-space: nowrap;
 }
 
+.cs2ps-metric-marker {
+	display: inline-block;
+	margin-left: 5px;
+	font-size: 12px;
+	font-weight: 400;
+	line-height: 1;
+	vertical-align: 1px;
+}
+
+.cs2ps-aim-awful .cs2ps-metric-value { color: #a98163; }
+.cs2ps-aim-poor .cs2ps-metric-value { color: #c8797c; }
+.cs2ps-aim-developing .cs2ps-metric-value { color: #c79a6b; }
+.cs2ps-aim-average .cs2ps-metric-value { color: #c7ccd0; }
+.cs2ps-aim-good .cs2ps-metric-value { color: #78b8db; }
+.cs2ps-aim-great .cs2ps-metric-value { color: #e1a75f; }
+.cs2ps-aim-elite .cs2ps-metric-value { color: #79c9ef; }
+
 .cs2ps-form-row {
 	display: flex;
 	align-items: center;
@@ -392,6 +457,13 @@
 	font-size: 10px;
 }
 
+.cs2ps-faceit-copy {
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
 .cs2ps-faceit-mark {
 	color: #667783;
 	font-size: 12px;
@@ -403,10 +475,29 @@
 	color: #d8662f;
 }
 
-.cs2ps-faceit-check {
+.cs2ps-faceit-level {
+	flex: 0 0 auto;
 	margin-left: auto;
-	color: #78b884;
+	padding: 3px 5px 2px;
+	font-size: 8px;
+	font-weight: 800;
+	line-height: 10px;
+	border: 1px solid currentColor;
+	border-radius: 2px;
 }
+
+.cs2ps-faceit-matches {
+	flex: 0 0 auto;
+	color: #91a2ae;
+	font-size: 9px;
+	white-space: nowrap;
+}
+
+.cs2ps-faceit-level-grey { color: #a7b0b7; background: rgba(167, 176, 183, 0.08); }
+.cs2ps-faceit-level-green { color: #5fcf55; background: rgba(95, 207, 85, 0.08); }
+.cs2ps-faceit-level-yellow { color: #e8ba42; background: rgba(232, 186, 66, 0.08); }
+.cs2ps-faceit-level-orange { color: #ef7b32; background: rgba(239, 123, 50, 0.08); }
+.cs2ps-faceit-level-red { color: #ee4b45; background: rgba(238, 75, 69, 0.08); }
 
 .cs2ps-details {
 	border-top: 1px solid rgba(102, 192, 244, 0.13);
@@ -649,6 +740,95 @@
 	font-weight: 600;
 	text-align: right;
 	overflow-wrap: anywhere;
+}
+
+.cs2ps-inventory-action,
+.cs2ps-inventory-state,
+.cs2ps-inventory-value {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 10px;
+	width: 100%;
+	min-height: 48px;
+	margin-top: 9px;
+	padding: 9px 10px;
+	color: #8195a3;
+	background: rgba(102, 192, 244, 0.035);
+	border: 1px solid rgba(102, 192, 244, 0.09);
+	border-radius: 3px;
+	font-size: 9px;
+}
+
+.cs2ps-inventory-action {
+	font-family: inherit;
+	text-align: left;
+	cursor: pointer;
+}
+
+.cs2ps-inventory-action:hover {
+	background: rgba(102, 192, 244, 0.07);
+	border-color: rgba(102, 192, 244, 0.17);
+}
+
+.cs2ps-inventory-action span,
+.cs2ps-inventory-value > span,
+.cs2ps-inventory-large > span {
+	display: block;
+	min-width: 0;
+}
+
+.cs2ps-inventory-action strong,
+.cs2ps-inventory-value strong,
+.cs2ps-inventory-large strong {
+	display: block;
+	color: #cdd7de;
+	font-size: 10px;
+	font-weight: 600;
+}
+
+.cs2ps-inventory-action small,
+.cs2ps-inventory-value small,
+.cs2ps-inventory-large small {
+	display: block;
+	margin-top: 3px;
+	overflow: hidden;
+	color: #687d8c;
+	font-size: 8px;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.cs2ps-inventory-action b,
+.cs2ps-inventory-state a,
+.cs2ps-inventory-state button,
+.cs2ps-inventory-price a {
+	flex: 0 0 auto;
+	color: #66c0f4;
+	background: transparent;
+	border: 0;
+	font-size: 9px;
+	font-weight: 500;
+	text-decoration: none;
+	cursor: pointer;
+}
+
+.cs2ps-inventory-price {
+	display: block;
+	flex: 0 0 auto;
+	text-align: right;
+}
+
+.cs2ps-inventory-price strong {
+	color: #e4ebef;
+	font-size: 13px;
+}
+
+.cs2ps-inventory-price a {
+	display: block;
+	margin-top: 3px;
+	color: #758b9a;
+	font-size: 8px;
 }
 
 .cs2ps-detail-note {

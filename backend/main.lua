@@ -2,8 +2,9 @@ local cjson = require("json")
 local http = require("http")
 local logger = require("logger")
 local millennium = require("millennium")
+local utils = require("utils")
 
-local PLUGIN_VERSION = "0.3.0"
+local PLUGIN_VERSION = "0.4.0"
 local USER_AGENT = "millennium-cs2-profile-stats/" .. PLUGIN_VERSION
 
 local function encode(payload)
@@ -46,10 +47,10 @@ local function valid_steam_id(steam_id)
     return type(steam_id) == "string" and steam_id:match("^%d%d%d%d%d%d%d%d%d%d%d%d%d%d%d%d%d$") ~= nil
 end
 
-local function request_json(url, headers)
+local function request_json(url, headers, timeout)
     local response, request_error = http.get(url, {
         headers = headers,
-        timeout = 10,
+        timeout = timeout or 10,
         follow_redirects = true,
         verify_ssl = true,
         user_agent = USER_AGENT,
@@ -147,7 +148,7 @@ local function scaled_rating(value)
     return number * 100
 end
 
-local function normalize_public_leetify_profile(profile, steam_id)
+local function normalize_public_leetify_profile(profile, steam_id, recent_kd, recent_kd_matches)
     local ranks = type(profile.ranks) == "table" and profile.ranks or {}
     local rating = type(profile.rating) == "table" and profile.rating or {}
     local stats = type(profile.stats) == "table" and profile.stats or {}
@@ -190,6 +191,8 @@ local function normalize_public_leetify_profile(profile, steam_id)
             opening = scaled_rating(rating.opening),
         },
         stats = {
+            kd = recent_kd,
+            kd_matches = recent_kd_matches,
             reaction_time_ms = optional(stats.reaction_time_ms),
             preaim = optional(stats.preaim),
             spray_accuracy = optional(stats.spray_accuracy),
@@ -233,6 +236,66 @@ local function average_legacy_stat(games, limit, key, multiplier)
     end
 
     return (total / count) * (multiplier or 1)
+end
+
+local function aggregate_legacy_kd(games, limit)
+    local kills = 0
+    local deaths = 0
+    local matches = 0
+
+    for index = 1, math.min(#games, limit) do
+        local match = games[index]
+        local match_kills = type(match) == "table" and number_or_nil(match.kills) or nil
+        local match_deaths = type(match) == "table" and number_or_nil(match.deaths) or nil
+        if match_kills ~= nil and match_deaths ~= nil and match_deaths > 0 then
+            kills = kills + match_kills
+            deaths = deaths + match_deaths
+            matches = matches + 1
+        end
+    end
+
+    if deaths == 0 then
+        return nil, nil
+    end
+
+    return kills / deaths, matches
+end
+
+local function get_public_recent_kd(steam_id, headers)
+    local url = "https://api-public.cs-prod.leetify.com/v3/profile/matches?steam64_id=" .. steam_id
+    local matches, status, request_error = request_json(url, headers, 4)
+    if matches == nil then
+        logger:warn("Leetify match history unavailable (" .. tostring(status) .. "): " .. tostring(request_error))
+        return nil, nil
+    end
+
+    local kills = 0
+    local deaths = 0
+    local match_count = 0
+
+    for _, match in ipairs(matches) do
+        local player_stats = type(match) == "table" and match.stats or nil
+        if type(player_stats) == "table" then
+            for _, player in ipairs(player_stats) do
+                if type(player) == "table" and tostring(player.steam64_id) == steam_id then
+                    local player_kills = number_or_nil(player.total_kills)
+                    local player_deaths = number_or_nil(player.total_deaths)
+                    if player_kills ~= nil and player_deaths ~= nil and player_deaths > 0 then
+                        kills = kills + player_kills
+                        deaths = deaths + player_deaths
+                        match_count = match_count + 1
+                    end
+                    break
+                end
+            end
+        end
+    end
+
+    if deaths == 0 then
+        return nil, nil
+    end
+
+    return kills / deaths, match_count
 end
 
 local function subtract_decimal_strings(left, right)
@@ -343,6 +406,7 @@ local function normalize_legacy_leetify_profile(profile, steam_id)
     local aggregate_limit = math.min(#games, games_played)
     local wins = 0
     local recent_matches = {}
+    local recent_kd, recent_kd_matches = aggregate_legacy_kd(games, aggregate_limit)
 
     for index = 1, aggregate_limit do
         local match = games[index]
@@ -391,6 +455,8 @@ local function normalize_legacy_leetify_profile(profile, steam_id)
             opening = scaled_rating(ratings.opening),
         },
         stats = {
+            kd = recent_kd,
+            kd_matches = recent_kd_matches,
             reaction_time_ms = average_legacy_stat(games, aggregate_limit, "reactionTime", 1000),
             preaim = average_legacy_stat(games, aggregate_limit, "preaim"),
             spray_accuracy = nil,
@@ -458,9 +524,10 @@ function get_leetify_profile(steamId)
         return encode({ status = "private", message = "This Leetify profile is private." })
     end
 
+    local recent_kd, recent_kd_matches = get_public_recent_kd(steamId, headers)
     return encode({
         status = "ok",
-        data = normalize_public_leetify_profile(profile, steamId),
+        data = normalize_public_leetify_profile(profile, steamId, recent_kd, recent_kd_matches),
         fetched_at = os.time(),
     })
 end
@@ -540,8 +607,8 @@ function get_faceit_profile(steamId)
     local html_error = nil
     local partial_message = nil
 
-    if next(lifetime) == nil then
-        local stats_url = "https://faceit-finder.com/id/" .. steamId .. "?lang=en"
+    if next(lifetime) == nil and type(player.nickname) == "string" and player.nickname ~= "" then
+        local stats_url = "https://faceit-finder.com/id/" .. utils.url_encode(player.nickname) .. "?lang=en"
         stats_response, html_error = http.get(stats_url, {
             headers = { ["Accept"] = "text/html" },
             timeout = 12,

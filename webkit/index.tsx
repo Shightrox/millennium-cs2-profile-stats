@@ -43,6 +43,8 @@ type LeetifyProfile = {
 		opening?: number;
 	};
 	stats: {
+		kd?: number;
+		kd_matches?: number;
 		reaction_time_ms?: number;
 		damage_time_min_ms?: number;
 		damage_time_max_ms?: number;
@@ -86,6 +88,15 @@ type SteamProfile = {
 	recentHours?: string;
 };
 
+type InventoryState = {
+	status: 'idle' | 'loading' | 'ok' | 'private' | 'too_large' | 'error';
+	valueUsd?: number;
+	totalItems?: number;
+	marketableItems?: number;
+	pricedItems?: number;
+	message?: string;
+};
+
 type Preferences = {
 	show_steam_details: boolean;
 	expand_details: boolean;
@@ -97,6 +108,7 @@ type ViewState = {
 	leetify: ProviderResponse<LeetifyProfile>;
 	faceit: ProviderResponse<FaceitProfile>;
 	steam: SteamProfile;
+	inventory: InventoryState;
 	preferences: Preferences;
 	expanded: boolean;
 	activeTab: DetailTab;
@@ -200,6 +212,11 @@ const formatPercent = (value: unknown) => {
 	return parsed === undefined ? '—' : `${formatMetric(parsed, 1)}%`;
 };
 
+const formatUsd = (value: unknown) => {
+	const parsed = finiteNumber(value);
+	return parsed === undefined ? '—' : new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(parsed);
+};
+
 const statusMessage = (provider: 'Leetify' | 'FACEIT', response: ProviderResponse<unknown>) => {
 	if (response.status === 'loading') return `Loading ${provider}…`;
 	if (response.message) return response.message;
@@ -229,12 +246,43 @@ const formatSignedMetric = (value: unknown, maximumFractionDigits = 1) => {
 	return `${parsed > 0 ? '+' : ''}${formatMetric(parsed, maximumFractionDigits)}`;
 };
 
-const compactMetric = (icon: MetricIcon, label: string, value: string) => `
-	<div class="cs2ps-metric">
+const compactMetric = (icon: MetricIcon, label: string, value: string, modifier = '', marker = '', markerLabel = '') => `
+	<div class="cs2ps-metric ${modifier}">
 		<span class="cs2ps-metric-label"><span class="cs2ps-metric-icon">${metricIcon(icon)}</span>${escapeHtml(label)}</span>
-		<strong class="cs2ps-metric-value">${escapeHtml(value)}</strong>
+		<strong class="cs2ps-metric-value">${escapeHtml(value)}${marker ? `<span class="cs2ps-metric-marker" role="img" aria-label="${escapeHtml(markerLabel)}" title="${escapeHtml(markerLabel)}">${marker}</span>` : ''}</strong>
 	</div>
 `;
+
+const aimPresentation = (value: unknown) => {
+	const aim = finiteNumber(value);
+	if (aim === undefined) return { modifier: '', marker: '', label: '' };
+	if (aim < 10) return { modifier: 'cs2ps-aim-awful', marker: '💩', label: 'Very low aim rating' };
+	if (aim < 25) return { modifier: 'cs2ps-aim-poor', marker: '🤡', label: 'Low aim rating' };
+	if (aim < 45) return { modifier: 'cs2ps-aim-developing', marker: '😬', label: 'Developing aim rating' };
+	if (aim < 60) return { modifier: 'cs2ps-aim-average', marker: '😐', label: 'Average aim rating' };
+	if (aim < 75) return { modifier: 'cs2ps-aim-good', marker: '👍', label: 'Good aim rating' };
+	if (aim < 90) return { modifier: 'cs2ps-aim-great', marker: '🔥', label: 'Great aim rating' };
+	return { modifier: 'cs2ps-aim-elite', marker: '🎯', label: 'Elite aim rating' };
+};
+
+const premierTierClass = (value: number) => {
+	if (value < 5_000) return 'cs2ps-premier-grey';
+	if (value < 10_000) return 'cs2ps-premier-cyan';
+	if (value < 15_000) return 'cs2ps-premier-blue';
+	if (value < 20_000) return 'cs2ps-premier-purple';
+	if (value < 25_000) return 'cs2ps-premier-pink';
+	if (value < 30_000) return 'cs2ps-premier-red';
+	return 'cs2ps-premier-gold';
+};
+
+const faceitLevelClass = (value: unknown) => {
+	const level = finiteNumber(value);
+	if (level === undefined || level <= 1) return 'cs2ps-faceit-level-grey';
+	if (level <= 3) return 'cs2ps-faceit-level-green';
+	if (level <= 7) return 'cs2ps-faceit-level-yellow';
+	if (level <= 9) return 'cs2ps-faceit-level-orange';
+	return 'cs2ps-faceit-level-red';
+};
 
 const detailStat = (label: string, value: string) => `
 	<div class="cs2ps-detail-stat"><span>${escapeHtml(label)}</span><strong>${escapeHtml(value)}</strong></div>
@@ -300,14 +348,21 @@ const providerState = (provider: 'Leetify' | 'FACEIT', response: ProviderRespons
 	</div>
 `;
 
+const ratingMetadata = (profile: LeetifyProfile) => `
+	<span class="cs2ps-rating-meta">
+		<span><strong>${escapeHtml(formatInteger(profile.total_matches))}</strong> matches</span>
+		${hasValue(profile.stats.kd) ? `<span title="K/D over ${escapeHtml(formatInteger(profile.stats.kd_matches))} recent tracked matches"><strong>${escapeHtml(formatMetric(profile.stats.kd, 2))}</strong> K/D</span>` : ''}
+	</span>
+`;
+
 const renderRating = (profile: LeetifyProfile) => {
 	const premier = finiteNumber(profile.ranks.premier);
 	const leetify = finiteNumber(profile.ranks.leetify);
 	if (premier !== undefined) {
 		return `
 			<div class="cs2ps-rating cs2ps-rating-premier">
-				<div class="cs2ps-premier-emblem"><span class="cs2ps-premier-icon">${metricIcon('premier')}</span><span>Premier</span><strong>${escapeHtml(formatInteger(premier))}</strong></div>
-				<div class="cs2ps-secondary-rating"><span>Leetify rating</span><strong>${escapeHtml(formatLeetifyRating(leetify))}</strong><small>${escapeHtml(formatInteger(profile.total_matches))} tracked matches</small></div>
+				<div class="cs2ps-premier-emblem ${premierTierClass(premier)}"><span class="cs2ps-premier-icon">${metricIcon('premier')}</span><span>Premier</span><strong>${escapeHtml(formatInteger(premier))}</strong></div>
+				<div class="cs2ps-secondary-rating"><span>Leetify rating</span><strong>${escapeHtml(formatLeetifyRating(leetify))}</strong>${ratingMetadata(profile)}</div>
 			</div>
 		`;
 	}
@@ -315,7 +370,7 @@ const renderRating = (profile: LeetifyProfile) => {
 	const ratingPosition = leetify === undefined ? 50 : Math.max(3, Math.min(97, ((leetify + 10) / 20) * 100));
 	return `
 		<div class="cs2ps-rating cs2ps-rating-leetify">
-			<div class="cs2ps-rating-copy"><span>Leetify rating</span><strong>${escapeHtml(formatLeetifyRating(leetify))}</strong><small>Recent performance</small></div>
+			<div class="cs2ps-rating-copy"><span>Leetify rating</span><strong>${escapeHtml(formatLeetifyRating(leetify))}</strong>${ratingMetadata(profile)}</div>
 			<div class="cs2ps-rating-scale" aria-label="Leetify rating scale from minus 10 to plus 10">
 				<span class="cs2ps-scale-line"></span><span class="cs2ps-scale-zero"></span><span class="cs2ps-scale-dot" style="left:${ratingPosition}%"></span>
 				<span class="cs2ps-scale-labels"><span>−10</span><span>0</span><span>+10</span></span>
@@ -343,6 +398,36 @@ const renderMatchList = (matches: LeetifyProfile['recent_matches']) => `
 			.join('')}
 	</div>
 `;
+
+const renderInventoryValue = (inventory: InventoryState, steamId: string) => {
+	const inventoryUrl = `https://steamcommunity.com/profiles/${encodeURIComponent(steamId)}/inventory/#730`;
+	if (inventory.status === 'idle') {
+		return `
+			<button class="cs2ps-inventory-action" type="button" data-inventory-action>
+				<span><strong>CS2 inventory</strong><small>Estimate using lowest Steam Market prices</small></span><b>Check value</b>
+			</button>
+		`;
+	}
+	if (inventory.status === 'loading') {
+		return `<div class="cs2ps-inventory-state"><span class="cs2ps-spinner"></span><span>Pricing public inventory…</span></div>`;
+	}
+	if (inventory.status === 'private') {
+		return `<div class="cs2ps-inventory-state"><span>CS2 inventory is private</span><a href="${inventoryUrl}" target="_blank" rel="noopener">Open ↗</a></div>`;
+	}
+	if (inventory.status === 'too_large') {
+		return `<div class="cs2ps-inventory-state cs2ps-inventory-large"><span><strong>${escapeHtml(formatInteger(inventory.totalItems))} items</strong><small>Too many unique items for safe Steam pricing</small></span><a href="${inventoryUrl}" target="_blank" rel="noopener">Open ↗</a></div>`;
+	}
+	if (inventory.status === 'error') {
+		return `<div class="cs2ps-inventory-state"><span>Inventory value unavailable</span><button type="button" data-inventory-action>Retry</button></div>`;
+	}
+
+	return `
+		<div class="cs2ps-inventory-value">
+			<span><strong>CS2 inventory</strong><small>${escapeHtml(formatInteger(inventory.pricedItems))}/${escapeHtml(formatInteger(inventory.marketableItems))} marketable priced · ${escapeHtml(formatInteger(inventory.totalItems))} items</small></span>
+			<span class="cs2ps-inventory-price"><strong>≈ ${escapeHtml(formatUsd(inventory.valueUsd))}</strong><a href="${inventoryUrl}" target="_blank" rel="noopener">Steam prices ↗</a></span>
+		</div>
+	`;
+};
 
 const renderDetails = (state: ViewState, steamId: string) => {
 	const leetify = state.leetify.data;
@@ -398,7 +483,7 @@ const renderDetails = (state: ViewState, steamId: string) => {
 		? `<section class="cs2ps-panel ${state.activeTab === 'faceit' ? 'cs2ps-panel-active' : ''}" data-panel="faceit"><div class="cs2ps-panel-heading"><span>${escapeHtml(faceit.nickname || 'FACEIT player')}</span>${faceitUrl ? `<a href="${faceitUrl}" target="_blank" rel="noopener">FACEIT ↗</a>` : ''}</div><div class="cs2ps-detail-stats">${faceitStats}</div></section>`
 		: '';
 	const steamPanel = state.preferences.show_steam_details
-		? `<section class="cs2ps-panel ${state.activeTab === 'steam' ? 'cs2ps-panel-active' : ''}" data-panel="steam"><div class="cs2ps-detail-list">${detailedRow('CS2 hours', state.steam.hours || 'Private')}${detailedRow('Last 2 weeks', state.steam.recentHours || (state.steam.status === 'loading' ? 'Loading…' : 'Private'))}${detailedRow('Member since', state.steam.memberSince || (state.steam.status === 'loading' ? 'Loading…' : 'Unknown'))}</div></section>`
+		? `<section class="cs2ps-panel ${state.activeTab === 'steam' ? 'cs2ps-panel-active' : ''}" data-panel="steam"><div class="cs2ps-detail-list">${detailedRow('CS2 hours', state.steam.hours || 'Private')}${detailedRow('Last 2 weeks', state.steam.recentHours || (state.steam.status === 'loading' ? 'Loading…' : 'Private'))}${detailedRow('Member since', state.steam.memberSince || (state.steam.status === 'loading' ? 'Loading…' : 'Unknown'))}</div>${renderInventoryValue(state.inventory, steamId)}</section>`
 		: '';
 
 	return `
@@ -420,8 +505,11 @@ const renderCard = (root: HTMLElement, state: ViewState, steamId: string) => {
 	const reactionValue = hasScopeDamageTime
 		? formatSecondsRange(leetify?.stats.damage_time_min_ms, leetify?.stats.damage_time_max_ms)
 		: formatMilliseconds(leetify?.stats.reaction_time_ms);
+	const aimStyle = aimPresentation(leetify?.rating.aim);
+	const faceitLevel = finiteNumber(faceit?.level) ?? finiteNumber(leetify?.ranks.faceit);
+	const faceitMatches = faceit?.stats.matches;
 	const faceitStatus = faceitFound
-		? { modifier: 'cs2ps-faceit-found', text: faceit?.nickname ? `FACEIT · ${faceit.nickname}` : 'FACEIT account found' }
+		? { modifier: 'cs2ps-faceit-found', text: 'FACEIT' }
 		: !providersFinished
 			? { modifier: 'cs2ps-faceit-loading', text: 'Checking FACEIT account…' }
 			: state.faceit.status === 'not_found'
@@ -446,7 +534,7 @@ const renderCard = (root: HTMLElement, state: ViewState, steamId: string) => {
 			: `
 				${renderRating(leetify)}
 				<div class="cs2ps-summary-grid">
-					${compactMetric('aim', 'Aim', formatMetric(leetify.rating.aim))}
+					${compactMetric('aim', 'Aim', formatMetric(leetify.rating.aim), aimStyle.modifier, aimStyle.marker, aimStyle.label)}
 					${compactMetric('reaction', hasScopeDamageTime ? 'AWP damage' : 'Reaction', reactionValue)}
 					${compactMetric('winrate', 'Win rate', formatWinrate(leetify.winrate))}
 				</div>
@@ -461,7 +549,11 @@ const renderCard = (root: HTMLElement, state: ViewState, steamId: string) => {
 				<span class="cs2ps-header-meta">${isLoading ? '<span class="cs2ps-spinner"></span>' : ''}<span>${state.expanded ? 'Hide' : 'Details'}</span><span class="cs2ps-chevron">⌃</span></span>
 			</button>
 			${performanceSummary}
-			<div class="cs2ps-faceit-status ${faceitStatus.modifier}"><span class="cs2ps-faceit-mark">F</span><span>${escapeHtml(faceitStatus.text)}</span>${faceitFound ? '<span class="cs2ps-faceit-check">✓</span>' : ''}</div>
+			<div class="cs2ps-faceit-status ${faceitStatus.modifier}">
+				<span class="cs2ps-faceit-mark">F</span><span class="cs2ps-faceit-copy">${escapeHtml(faceitStatus.text)}</span>
+				${faceitFound && faceitLevel !== undefined ? `<strong class="cs2ps-faceit-level ${faceitLevelClass(faceitLevel)}">LVL ${escapeHtml(formatInteger(faceitLevel))}</strong>` : ''}
+				${faceitFound && hasValue(faceitMatches) ? `<span class="cs2ps-faceit-matches">${escapeHtml(faceitMatches!)} matches</span>` : ''}
+			</div>
 			${renderDetails(state, steamId)}
 		</div>
 	`;
@@ -476,6 +568,130 @@ const renderCard = (root: HTMLElement, state: ViewState, steamId: string) => {
 			renderCard(root, state, steamId);
 		});
 	});
+	root.querySelector<HTMLButtonElement>('[data-inventory-action]')?.addEventListener('click', () => {
+		if (!/^\d{17}$/.test(steamId) || state.inventory.status === 'loading') return;
+		state.inventory = { status: 'loading' };
+		renderCard(root, state, steamId);
+		void getInventoryValue(steamId)
+			.then((inventory) => {
+				state.inventory = inventory;
+			})
+			.catch((error) => {
+				state.inventory = { status: 'error', message: error instanceof Error ? error.message : String(error) };
+			})
+			.finally(() => renderCard(root, state, steamId));
+	});
+};
+
+type SteamInventoryPage = {
+	success?: number;
+	total_inventory_count?: number;
+	more_items?: boolean;
+	last_assetid?: string;
+	assets?: Array<{ classid?: string; instanceid?: string; amount?: string }>;
+	descriptions?: Array<{ classid?: string; instanceid?: string; marketable?: number; market_hash_name?: string }>;
+};
+
+const inventoryValueCache = new Map<string, Promise<InventoryState>>();
+const INVENTORY_PAGE_SIZE = 2_000;
+const MAX_INVENTORY_PAGES = 3;
+const MAX_UNIQUE_MARKET_ITEMS = 60;
+const MARKET_PRICE_CONCURRENCY = 4;
+
+const parseUsdPrice = (value: unknown) => {
+	if (typeof value !== 'string') return undefined;
+	const parsed = Number(value.replace(/[^\d.,-]/g, '').replace(/,/g, ''));
+	return Number.isFinite(parsed) ? parsed : undefined;
+};
+
+const fetchMarketPriceUsd = async (marketHashName: string) => {
+	const url = new URL('/market/priceoverview/', window.location.origin);
+	url.searchParams.set('appid', '730');
+	url.searchParams.set('currency', '1');
+	url.searchParams.set('market_hash_name', marketHashName);
+	const response = await fetchWithTimeout(url, { credentials: 'same-origin' }, 8_000);
+	if (!response.ok) return undefined;
+	const payload = (await response.json()) as { success?: boolean; lowest_price?: string; median_price?: string };
+	if (!payload.success) return undefined;
+	return parseUsdPrice(payload.lowest_price) ?? parseUsdPrice(payload.median_price);
+};
+
+const fetchInventoryValue = async (steamId: string): Promise<InventoryState> => {
+	const quantities = new Map<string, number>();
+	const descriptions = new Map<string, NonNullable<SteamInventoryPage['descriptions']>[number]>();
+	let totalItems = 0;
+	let lastAssetId = '';
+	let hasMoreItems = false;
+
+	for (let pageIndex = 0; pageIndex < MAX_INVENTORY_PAGES; pageIndex += 1) {
+		const url = new URL(`/inventory/${steamId}/730/2`, window.location.origin);
+		url.searchParams.set('l', 'english');
+		url.searchParams.set('count', String(INVENTORY_PAGE_SIZE));
+		if (lastAssetId) url.searchParams.set('start_assetid', lastAssetId);
+		const response = await fetchWithTimeout(url, { credentials: 'same-origin' }, 10_000);
+		if (response.status === 401 || response.status === 403) return { status: 'private' };
+		if (!response.ok) throw new Error(`Steam inventory returned HTTP ${response.status}.`);
+		const payload = (await response.json()) as SteamInventoryPage;
+		if (payload.success !== 1) return { status: 'private' };
+		totalItems = finiteNumber(payload.total_inventory_count) ?? totalItems;
+		for (const asset of payload.assets || []) {
+			const key = `${asset.classid || ''}_${asset.instanceid || '0'}`;
+			quantities.set(key, (quantities.get(key) || 0) + (finiteNumber(asset.amount) ?? 1));
+		}
+		for (const description of payload.descriptions || []) {
+			const key = `${description.classid || ''}_${description.instanceid || '0'}`;
+			descriptions.set(key, description);
+		}
+		hasMoreItems = payload.more_items === true;
+		lastAssetId = payload.last_assetid || '';
+		if (!hasMoreItems || !lastAssetId) break;
+	}
+
+	if (hasMoreItems) {
+		return { status: 'too_large', totalItems };
+	}
+
+	const marketItems = new Map<string, number>();
+	for (const [key, description] of descriptions) {
+		if (description.marketable !== 1 || !description.market_hash_name) continue;
+		marketItems.set(description.market_hash_name, (marketItems.get(description.market_hash_name) || 0) + (quantities.get(key) || 0));
+	}
+	const marketableItems = Array.from(marketItems.values()).reduce((sum, quantity) => sum + quantity, 0);
+	if (marketItems.size > MAX_UNIQUE_MARKET_ITEMS) {
+		return { status: 'too_large', totalItems, marketableItems };
+	}
+
+	const entries = Array.from(marketItems.entries());
+	let cursor = 0;
+	let valueUsd = 0;
+	let pricedItems = 0;
+	const worker = async () => {
+		while (cursor < entries.length) {
+			const entry = entries[cursor];
+			cursor += 1;
+			const [marketHashName, quantity] = entry;
+			const price = await fetchMarketPriceUsd(marketHashName);
+			if (price !== undefined) {
+				valueUsd += price * quantity;
+				pricedItems += quantity;
+			}
+		}
+	};
+	await Promise.all(Array.from({ length: Math.min(MARKET_PRICE_CONCURRENCY, Math.max(entries.length, 1)) }, () => worker()));
+	if (marketableItems > 0 && pricedItems === 0) throw new Error('Steam Market prices are temporarily unavailable.');
+
+	return { status: 'ok', valueUsd, totalItems, marketableItems, pricedItems };
+};
+
+const getInventoryValue = (steamId: string) => {
+	const cached = inventoryValueCache.get(steamId);
+	if (cached) return cached;
+	const request = fetchInventoryValue(steamId).catch((error) => {
+		inventoryValueCache.delete(steamId);
+		throw error;
+	});
+	inventoryValueCache.set(steamId, request);
+	return request;
 };
 
 const fetchSteamProfile = async (): Promise<SteamProfile> => {
@@ -534,6 +750,7 @@ export default async function WebkitMain() {
 		leetify: { status: 'loading' },
 		faceit: { status: 'loading' },
 		steam: { status: 'loading', steamId: '' },
+		inventory: { status: 'idle' },
 		preferences: { show_steam_details: true, expand_details: false },
 		expanded: false,
 		activeTab: 'overview',

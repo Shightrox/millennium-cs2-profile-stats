@@ -8,10 +8,11 @@ A compact CS2 statistics card embedded directly into Steam Community profile pag
 
 - Current Premier rating
 - FACEIT level and ELO
-- Leetify Rating, Aim, Positioning, and Utility
+- Leetify Rating, recent K/D, Aim, Positioning, and Utility
 - Leetify winrate, match count, and recent match history with map, date, and score
 - FACEIT lifetime K/D, ADR, HS%, winrate, and match count
 - Public Steam CS2 hours, recent hours, and account creation date
+- On-demand USD estimate for public CS2 inventories using lowest Steam Market prices
 - Compact summary plus separate Overview, Matches, FACEIT, and Steam detail tabs
 - Independent provider loading: one unavailable source does not hide the others
 - Works without mandatory API keys
@@ -24,8 +25,9 @@ The card is inserted into the right-hand column of Steam profiles, below the cur
 - [SCOPE.GG](https://scope.gg/) public player pages for an AWP time-to-damage range when that metric is absent from a legacy Leetify profile.
 - [Faceit Finder](https://faceit-finder.com/) for zero-configuration Steam-to-FACEIT lookup and public FACEIT statistics.
 - Steam Community's public profile XML for SteamID64, account age, and public playtime.
+- Steam Community's public inventory endpoint and Market price overview for the optional inventory estimate. Only marketable items with an available price are included; stickers and other item-specific premiums are not appraised.
 
-Leetify may expose fewer detailed metrics for unregistered players; the summary ratings and recent matches remain available when Leetify has tracked them. Private Steam game details prevent playtime from being displayed.
+Leetify may expose fewer detailed metrics for unregistered players; the summary ratings and recent matches remain available when Leetify has tracked them. Private Steam game details prevent playtime from being displayed, and private inventories cannot be valued.
 
 FACEIT integration is isolated behind its own provider because the zero-configuration lookup is not an official, versioned FACEIT API. If that source changes, Leetify and Steam data continue to work.
 
