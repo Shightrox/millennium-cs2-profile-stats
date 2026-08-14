@@ -48,7 +48,7 @@ The card sits below the profile's online status and adapts to the data available
 3. Restart Steam.
 4. Open **Steam → Millennium → Plugins**, enable **CS2 Profile Stats**, and save the changes.
 
-An installation through the SteamBrew plugin directory is planned after review.
+A SteamBrew plugin-directory submission is pending review.
 
 ### Development checkout
 

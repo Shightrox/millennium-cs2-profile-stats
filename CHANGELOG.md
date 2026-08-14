@@ -2,6 +2,16 @@
 
 All notable changes to this project are documented here. The project follows [Semantic Versioning](https://semver.org/).
 
+## [0.4.4] - 2026-08-14
+
+### Fixed
+
+- Point the plugin manifest at Millennium's current JSON schema location.
+
+### Changed
+
+- Replace cropped card previews with full Steam profile screenshots for the public listing.
+
 ## [0.4.3] - 2026-08-14
 
 ### Fixed
