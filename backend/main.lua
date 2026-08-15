@@ -4,7 +4,7 @@ local logger = require("logger")
 local millennium = require("millennium")
 local utils = require("utils")
 
-local PLUGIN_VERSION = "0.4.3"
+local PLUGIN_VERSION = "0.4.5"
 local USER_AGENT = "millennium-cs2-profile-stats/" .. PLUGIN_VERSION
 
 local function encode(payload)
@@ -611,9 +611,14 @@ function get_faceit_profile(steamId)
     local stats_response = nil
     local html_error = nil
     local partial_message = nil
+    local lifetime_matches = optional(lifetime.matches) or first_lifetime_value(lifetime, { "Matches", "matches", "m35" })
+    local lifetime_kd = optional(lifetime.kd) or first_lifetime_value(lifetime, { "Average K/D Ratio", "K/D Ratio", "K/D", "kd", "k5" })
 
-    if next(lifetime) == nil and type(player.nickname) == "string" and player.nickname ~= "" then
-        local stats_url = "https://faceit-finder.com/id/" .. utils.url_encode(player.nickname) .. "?lang=en"
+    -- The public FACEIT endpoint can return a non-empty lifetime object without
+    -- the summary fields we display. In that case, supplement the missing values
+    -- from Faceit Finder instead of treating any non-empty object as complete.
+    if lifetime_matches == nil or lifetime_kd == nil then
+        local stats_url = "https://faceit-finder.com/id/" .. steamId .. "?lang=en"
         stats_response, html_error = http.get(stats_url, {
             headers = { ["Accept"] = "text/html" },
             timeout = 12,
@@ -624,15 +629,18 @@ function get_faceit_profile(steamId)
 
         if stats_response ~= nil and stats_response.status == 200 then
             local hero = stats_response.body:match("Kluczowe liczby.-ELO Rating") or stats_response.body:match("Key numbers.-ELO Rating") or stats_response.body
-            lifetime.matches = hero:match(">Matches</p>%s*<p[^>]*>([^<]+)</p>")
-            lifetime.winrate = hero:match(">Win Rate</p>%s*<p[^>]*>([^<]+)</p>")
-            lifetime.kd = hero:match(">K/D</p>%s*<p[^>]*>([^<]+)</p>")
-            lifetime.adr = hero:match(">ADR</p>%s*<p[^>]*>([^<]+)</p>")
-            lifetime.headshots = hero:match(">HS %%</p>%s*<p[^>]*>([^<]+)</p>")
+            lifetime.matches = lifetime_matches or hero:match(">Matches</p>%s*<p[^>]*>([^<]+)</p>")
+            lifetime.winrate = optional(lifetime.winrate) or first_lifetime_value(lifetime, { "Win Rate %", "Winrate", "winrate", "k6" }) or hero:match(">Win Rate</p>%s*<p[^>]*>([^<]+)</p>")
+            lifetime.kd = lifetime_kd or hero:match(">K/D</p>%s*<p[^>]*>([^<]+)</p>")
+            lifetime.adr = optional(lifetime.adr) or first_lifetime_value(lifetime, { "ADR", "Average Damage Per Round", "adr", "k17" }) or hero:match(">ADR</p>%s*<p[^>]*>([^<]+)</p>")
+            lifetime.headshots = optional(lifetime.headshots) or first_lifetime_value(lifetime, { "Average Headshots %", "Headshots %", "HS %", "headshots", "k8" }) or hero:match(">HS %%</p>%s*<p[^>]*>([^<]+)</p>")
         end
     end
 
-    if next(lifetime) == nil then
+    lifetime_matches = optional(lifetime.matches) or first_lifetime_value(lifetime, { "Matches", "matches", "m35" })
+    lifetime_kd = optional(lifetime.kd) or first_lifetime_value(lifetime, { "Average K/D Ratio", "K/D Ratio", "K/D", "kd", "k5" })
+
+    if lifetime_matches == nil and lifetime_kd == nil then
         partial_message = "FACEIT profile loaded, but lifetime statistics are unavailable."
         local html_status = stats_response and stats_response.status or 0
         logger:info("Optional FACEIT lifetime stats unavailable (API " .. tostring(stats_status) .. ", HTML " .. tostring(html_status) .. "): " .. tostring(stats_error or html_error))
@@ -649,12 +657,12 @@ function get_faceit_profile(steamId)
             elo = optional(cs2.faceit_elo),
             region = optional(cs2.region),
             stats = {
-                matches = optional(lifetime.matches) or first_lifetime_value(lifetime, { "Matches", "matches" }),
-                kd = optional(lifetime.kd) or first_lifetime_value(lifetime, { "Average K/D Ratio", "K/D Ratio", "K/D", "kd" }),
-                adr = optional(lifetime.adr) or first_lifetime_value(lifetime, { "ADR", "Average Damage Per Round", "adr" }),
-                headshots = optional(lifetime.headshots) or first_lifetime_value(lifetime, { "Average Headshots %", "Headshots %", "HS %", "headshots" }),
-                winrate = optional(lifetime.winrate) or first_lifetime_value(lifetime, { "Win Rate %", "Winrate", "winrate" }),
-                recent_results = {},
+                matches = lifetime_matches,
+                kd = lifetime_kd,
+                adr = optional(lifetime.adr) or first_lifetime_value(lifetime, { "ADR", "Average Damage Per Round", "adr", "k17" }),
+                headshots = optional(lifetime.headshots) or first_lifetime_value(lifetime, { "Average Headshots %", "Headshots %", "HS %", "headshots", "k8" }),
+                winrate = optional(lifetime.winrate) or first_lifetime_value(lifetime, { "Win Rate %", "Winrate", "winrate", "k6" }),
+                recent_results = type(lifetime.s0) == "table" and lifetime.s0 or {},
             },
         },
         fetched_at = os.time(),

@@ -2,6 +2,19 @@
 
 All notable changes to this project are documented here. The project follows [Semantic Versioning](https://semver.org/).
 
+## [0.4.5] - 2026-08-15
+
+### Added
+
+- Show the FACEIT nickname, lifetime match count, ELO, and K/D in a two-line compact profile summary.
+- Replace the rectangular FACEIT level badge with a colored circular level indicator.
+
+### Fixed
+
+- Parse FACEIT's compact lifetime-stat keys so match count, K/D, ADR, headshots, win rate, and recent results continue to load.
+- Keep the HTML lifetime-stat fallback available when the expected official API fields are missing.
+- Position the FACEIT level-ring opening at the bottom to match FACEIT's visual language.
+
 ## [0.4.4] - 2026-08-14
 
 ### Fixed

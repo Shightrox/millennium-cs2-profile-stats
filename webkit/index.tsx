@@ -280,9 +280,52 @@ const faceitLevelClass = (value: unknown) => {
 	const level = finiteNumber(value);
 	if (level === undefined || level <= 1) return 'cs2ps-faceit-level-grey';
 	if (level <= 3) return 'cs2ps-faceit-level-green';
-	if (level <= 7) return 'cs2ps-faceit-level-yellow';
-	if (level <= 9) return 'cs2ps-faceit-level-orange';
+	if (level <= 6) return 'cs2ps-faceit-level-yellow';
+	if (level <= 8) return 'cs2ps-faceit-level-orange';
 	return 'cs2ps-faceit-level-red';
+};
+
+const faceitCompactStat = (value: string, label: string) => `
+	<span class="cs2ps-faceit-stat"><strong>${escapeHtml(value)}</strong><span>${escapeHtml(label)}</span></span>
+`;
+
+const renderFaceitSummary = (
+	status: { modifier: string; text: string },
+	found: boolean,
+	level: number | undefined,
+	faceit: FaceitProfile | undefined,
+	leetify: LeetifyProfile | undefined,
+) => {
+	if (!found) {
+		return `
+			<div class="cs2ps-faceit-status ${status.modifier}">
+				<span class="cs2ps-faceit-mark">F</span><span class="cs2ps-faceit-copy">${escapeHtml(status.text)}</span>
+			</div>
+		`;
+	}
+
+	const elo = finiteNumber(faceit?.elo) ?? finiteNumber(leetify?.ranks.faceit_elo);
+	const matches = hasValue(faceit?.stats.matches) ? faceit!.stats.matches! : '—';
+	const kd = hasValue(faceit?.stats.kd) ? faceit!.stats.kd! : '—';
+	const nickname = faceit?.nickname;
+
+	return `
+		<div class="cs2ps-faceit-status ${status.modifier}">
+			<span class="cs2ps-faceit-mark">F</span>
+			<div class="cs2ps-faceit-main">
+				<div class="cs2ps-faceit-title">
+					<span class="cs2ps-faceit-copy">${escapeHtml(status.text)}</span>
+					${nickname ? `<span class="cs2ps-faceit-nickname" title="${escapeHtml(nickname)}">${escapeHtml(nickname)}</span>` : ''}
+				</div>
+				<div class="cs2ps-faceit-meta">
+					${faceitCompactStat(matches, 'matches')}
+					${faceitCompactStat(formatInteger(elo), 'ELO')}
+					${faceitCompactStat(kd, 'K/D')}
+				</div>
+			</div>
+			${level !== undefined ? `<strong class="cs2ps-faceit-level ${faceitLevelClass(level)}" aria-label="FACEIT level ${escapeHtml(formatInteger(level))}" title="FACEIT level ${escapeHtml(formatInteger(level))}"><span>${escapeHtml(formatInteger(level))}</span></strong>` : ''}
+		</div>
+	`;
 };
 
 const detailStat = (label: string, value: string) => `
@@ -508,7 +551,6 @@ const renderCard = (root: HTMLElement, state: ViewState, steamId: string) => {
 		: formatMilliseconds(leetify?.stats.reaction_time_ms);
 	const aimStyle = aimPresentation(leetify?.rating.aim);
 	const faceitLevel = finiteNumber(faceit?.level) ?? finiteNumber(leetify?.ranks.faceit);
-	const faceitMatches = faceit?.stats.matches;
 	const faceitStatus = faceitFound
 		? { modifier: 'cs2ps-faceit-found', text: 'FACEIT' }
 		: !providersFinished
@@ -550,11 +592,7 @@ const renderCard = (root: HTMLElement, state: ViewState, steamId: string) => {
 				<span class="cs2ps-header-meta">${isLoading ? '<span class="cs2ps-spinner"></span>' : ''}<span>${state.expanded ? 'Hide' : 'Details'}</span><span class="cs2ps-chevron">⌃</span></span>
 			</button>
 			${performanceSummary}
-			<div class="cs2ps-faceit-status ${faceitStatus.modifier}">
-				<span class="cs2ps-faceit-mark">F</span><span class="cs2ps-faceit-copy">${escapeHtml(faceitStatus.text)}</span>
-				${faceitFound && faceitLevel !== undefined ? `<strong class="cs2ps-faceit-level ${faceitLevelClass(faceitLevel)}">LVL ${escapeHtml(formatInteger(faceitLevel))}</strong>` : ''}
-				${faceitFound && hasValue(faceitMatches) ? `<span class="cs2ps-faceit-matches">${escapeHtml(faceitMatches!)} matches</span>` : ''}
-			</div>
+			${renderFaceitSummary(faceitStatus, faceitFound, faceitLevel, faceit, leetify)}
 			${renderDetails(state, steamId)}
 		</div>
 	`;
