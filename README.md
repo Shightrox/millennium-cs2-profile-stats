@@ -17,11 +17,11 @@ Useful CS2 statistics, embedded directly into Steam Community profiles.
 
 ### Premier + FACEIT
 
-<img src="assets/screenshots/withpremier.jpg" alt="Expanded CS2 Profile Stats card embedded in a Steam profile with Premier and FACEIT ratings" width="100%">
+<img src="assets/screenshots/premier.png" alt="CS2 Profile Stats card embedded in a full Steam profile with Premier and FACEIT ratings" width="100%">
 
 ### No Premier rating
 
-<img src="assets/screenshots/nopremier.png" alt="Expanded CS2 Profile Stats card embedded in a Steam profile without a Premier rating" width="100%">
+<img src="assets/screenshots/nopremier.png" alt="CS2 Profile Stats card embedded in a full Steam profile without a Premier rating" width="100%">
 
 The card sits below the profile's online status and adapts to the data available for that player. Open **Details** for recent matches, extended Leetify and FACEIT metrics, Steam activity, and an optional inventory estimate.
 
